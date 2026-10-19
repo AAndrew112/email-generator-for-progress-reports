@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Records ({{ show }})</h2>
+<p><a href="{{ url_for('records') }}">all</a> · <a href="{{ url_for('records', show='dated') }}">dated</a> · <a href="{{ url_for('records', show='undated') }}">undated</a></p>
+<table>
+<tr><th>Date</th><th>Time</th><th>Confidence</th><th>Type</th><th>Source</th><th>Status</th><th>Review</th></tr>
+{% for x in rows %}
+<tr>
+  <td>{{ x.e.date or "UNDATED" }}</td>
+  <td>{{ x.e.time or "" }}</td>
+  <td>{{ x.e.timestamp_confidence }}</td>
+  <td>{{ x.r.source_type }}</td>
+  <td><a href="{{ url_for('record', record_id=x.r.record_id) }}">{{ x.r.source_filename }}</a>{% if x.r.page_number %} <span class="muted">p.{{ x.r.page_number }}</span>{% endif %}</td>
+  <td>{{ x.r.transcription_status }}{% if x.r.approved_at %} ✓{% endif %}</td>
+  <td>{% if x.open %}<span class="pill open">{{ x.open }} open</span>{% endif %}</td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

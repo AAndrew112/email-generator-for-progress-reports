@@ -1,0 +1,10 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+# Personal data never belongs in git.
+archive_data/
+config.toml
+client_secret*.json
+token*.json
+*.sqlite
+*.sqlite3

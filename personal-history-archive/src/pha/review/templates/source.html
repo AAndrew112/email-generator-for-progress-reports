@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ s.filename }}{% endblock %}
+{% block content %}
+<h2>{{ s.filename }}</h2>
+<p class="muted">{{ s.source_id }} · {{ s.source_type }} · status {{ s.status }}{% if s.ownership %} · ownership {{ s.ownership }}{% endif %}{% if s.duplicate_of %} · duplicate of <a href="{{ url_for('source', source_id=s.duplicate_of) }}">{{ s.duplicate_of }}</a>{% endif %}</p>
+{% if s.last_error %}<p class="flash">Last error: {{ s.last_error }}</p>{% endif %}
+<div class="grid">
+<div class="card">
+  {% if s.source_type == 'marco_polo' %}
+    <video controls preload="metadata" src="{{ url_for('media_source', source_id=s.source_id) }}"></video>
+    <form method="post" action="{{ url_for('ownership', source_id=s.source_id) }}" style="margin-top:10px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <p>Who recorded this video?</p>
+      <label>Note <input type="text" name="note" size="40"></label><br>
+      <button name="decision" value="owner">I recorded this</button>
+      <button name="decision" value="other">Someone else recorded this</button>
+    </form>
+  {% endif %}
+  <h3>Locations</h3>
+  <ul>{% for l in locations %}<li>{% if l.startswith('http') %}<a href="{{ l }}" target="_blank" rel="noopener">{{ l }}</a>{% else %}<code>{{ l }}</code>{% endif %}</li>{% endfor %}</ul>
+  {% if records %}<h3>Records</h3><ul>{% for r in records %}<li><a href="{{ url_for('record', record_id=r.record_id) }}">{{ r.record_id }}</a> {{ r.corrected_date or r.machine_date or 'undated' }}</li>{% endfor %}</ul>{% endif %}
+</div>
+<div class="card">
+  <h3>Review items</h3>
+  {% for i in items %}<div><span class="pill {{ 'open' if i.status == 'open' else '' }}">{{ i.kind }} · {{ i.status }}</span> {{ i.reason }}{% if i.resolution %} <span class="muted">→ {{ i.resolution }}</span>{% endif %}</div>{% else %}<p class="muted">None.</p>{% endfor %}
+  {% if detail %}<h3>Ownership evidence</h3><pre>{{ detail|tojson(indent=2) }}</pre>{% endif %}
+  <h3>Metadata</h3><pre>{{ meta|tojson(indent=2) }}</pre>
+</div>
+</div>
+{% endblock %}

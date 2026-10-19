@@ -1,0 +1,74 @@
+# Personal history archive configuration.
+# Relative paths are resolved against the folder containing this file.
+
+# Where the database, caches, logs and exports are written.
+data_dir = "archive_data"
+owner_name = ""
+
+# Sending anything to a cloud AI service requires this to be true.
+# Leave false to keep all recognition on this computer.
+cloud_ai_authorized = false
+
+[marco_polo]
+# Folder where you place your exported Marco Polo videos (searched recursively).
+input_dir = "marco_polo_exports"
+# Hours around a file's modification time in which a "recording" timestamp
+# is treated as an export/download time instead.
+contamination_window_hours = 36
+# IANA zone (e.g. "America/Chicago") used to show UTC-only timestamps as local
+# time. Such dates are marked "inferred". Leave empty to keep UTC.
+assume_timezone = ""
+# Transcribe videos with uncertain ownership before you review them.
+transcribe_uncertain = false
+
+# Add rules ONLY after `pha mp inspect` shows the field and you have checked it
+# against videos whose sender/date you know. Examples (disabled):
+#
+# [[marco_polo.ownership_rules]]
+# kind = "sidecar"            # or "container_tag"
+# name = "sender.name"
+# owner_values = ["Your Name"]
+#
+# [[marco_polo.timestamp_rules]]
+# kind = "container_tag"      # or "sidecar"
+# name = "com.apple.quicktime.creationdate"
+
+[voice]
+enabled = true
+backend = "resemblyzer"
+# Folder with several recordings you have checked are YOU speaking alone.
+owner_samples_dir = ""
+# Optional: other people's recordings, one sub-folder per person.
+other_samples_dir = ""
+# Tune with `pha mp calibrate`.
+accept_threshold = 0.80
+reject_threshold = 0.65
+min_margin = 0.05
+min_owner_window_fraction = 0.8
+min_enrollment_samples = 3
+
+[transcription]
+backend = "faster-whisper"
+model = "large-v3"
+device = "auto"          # "cuda" if you have an NVIDIA GPU
+compute_type = "default" # e.g. "int8" for CPU, "float16" for GPU
+language = ""            # e.g. "en"; empty = auto-detect
+beam_size = 5
+vad_filter = true
+
+[journals]
+drive_folder_name = "1 journals"
+drive_folder_id = ""     # set if several folders share the name
+client_secret_file = "client_secret.json"
+token_file = ""          # default: <data_dir>/google_token.json
+local_pdf_dir = ""       # alternative to Drive: a local folder of PDFs
+render_dpi = 200
+date_order = "MDY"       # how numeric dates like 3/4/98 are written: MDY or DMY
+duplicate_page_distance = 6
+
+[vision]
+backend = "ollama"       # "ollama" (local), "manual", or "anthropic" (cloud, needs authorization)
+ollama_url = "http://127.0.0.1:11434"
+ollama_model = "qwen2.5vl:7b"
+anthropic_model = ""
+timeout_seconds = 600

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Overview</h2>
+<div class="grid">
+  <div class="card">
+    <h3>Records</h3>
+    <p>{{ counts.records }} records: {{ counts.videos }} videos, {{ counts.journal_entries }} journal entries.</p>
+    <p>{{ counts.dated }} dated, <a href="{{ url_for('records', show='undated') }}">{{ counts.undated }} undated</a>.</p>
+  </div>
+  <div class="card">
+    <h3>Open review items</h3>
+    <ul>
+    {% for k, n in review_counts.items() %}
+      <li><a href="{{ url_for('queue', kind=k) }}">{{ k }}</a>: {{ n }}</li>
+    {% endfor %}
+    </ul>
+  </div>
+</div>
+<div class="card">
+  <h3>Sources by status</h3>
+  <table><tr><th>Type</th><th>Status</th><th>Count</th></tr>
+  {% for s in status_rows %}<tr><td>{{ s.source_type }}</td><td>{{ s.status }}</td><td>{{ s.n }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% if failures %}
+<div class="card">
+  <h3>Recent failures</h3>
+  <table><tr><th>When</th><th>Source</th><th>Stage</th><th>Error</th></tr>
+  {% for f in failures %}<tr><td class="muted">{{ f.at }}</td><td>{% if f.source_id %}<a href="{{ url_for('source', source_id=f.source_id) }}">{{ f.source_id }}</a>{% endif %}</td><td>{{ f.stage }}</td><td>{{ f.error }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Review queue{% if kind %}: {{ kind }}{% endif %}</h2>
+<p>
+  <a href="{{ url_for('queue') }}">all</a>
+  {% for k in kinds %} · <a href="{{ url_for('queue', kind=k) }}">{{ k }}</a>{% endfor %}
+</p>
+{% if not items %}<p class="muted">Nothing to review.</p>{% endif %}
+<table>
+<tr><th>Kind</th><th>Reason</th><th>Item</th><th>Date</th><th></th></tr>
+{% for x in items %}
+<tr>
+  <td><span class="pill open">{{ x.item.kind }}</span></td>
+  <td>{{ x.item.reason }}</td>
+  <td>
+    {% if x.record %}<a href="{{ url_for('record', record_id=x.record.record_id) }}">{{ x.record.source_filename }}</a>
+      {% if x.record.page_number %}<span class="muted">p.{{ x.record.page_number }}</span>{% endif %}
+    {% elif x.source %}<a href="{{ url_for('source', source_id=x.source.source_id) }}">{{ x.source.filename }}</a>{% endif %}
+  </td>
+  <td class="muted">{% if x.record %}{{ x.record.corrected_date or x.record.machine_date or "undated" }}{% endif %}</td>
+  <td>
+    <form method="post" action="{{ url_for('resolve', item_id=x.item.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button title="Mark as checked without changes">Dismiss</button>
+    </form>
+  </td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

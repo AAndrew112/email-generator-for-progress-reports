@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "personal-history-archive"
+version = "0.1.0"
+description = "Local-first transcription and chronological archive of Marco Polo videos and handwritten journals"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+    "pillow>=10",
+    "pypdfium2>=4.20",
+    "flask>=3.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# Local speech recognition (Whisper via CTranslate2).
+transcribe = ["faster-whisper>=1.0"]
+# Local voice verification (bundled pretrained weights, no model download).
+# webrtcvad (a resemblyzer dependency) still imports pkg_resources.
+voice = ["resemblyzer>=0.1.4", "setuptools<81"]
+# Google Drive read-only access.
+drive = ["google-api-python-client>=2.100", "google-auth-oauthlib>=1.2"]
+# Cloud handwriting recognition. Only used when cloud_ai_authorized = true.
+cloud = ["anthropic>=0.40"]
+dev = ["pytest>=8"]
+all = [
+    "faster-whisper>=1.0",
+    "resemblyzer>=0.1.4",
+    "setuptools<81",
+    "google-api-python-client>=2.100",
+    "google-auth-oauthlib>=1.2",
+]
+
+[project.scripts]
+pha = "pha.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pha = ["review/templates/*.html", "config.example.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

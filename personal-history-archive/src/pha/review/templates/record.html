@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ r.source_filename }}{% endblock %}
+{% block content %}
+<h2>{{ r.source_filename }}{% if r.page_number %} — page {{ r.page_number }}{% if r.page_end and r.page_end != r.page_number %}–{{ r.page_end }}{% endif %}{% endif %}</h2>
+<p class="muted">{{ r.record_id }} · {{ r.source_type }} · status {{ r.transcription_status }}{% if r.approved_at %} · approved {{ r.approved_at }}{% endif %}</p>
+<p>Source: {% if r.source_location.startswith('http') %}<a href="{{ r.source_location }}" target="_blank" rel="noopener">{{ r.source_location }}</a>{% else %}<code>{{ r.source_location }}</code>{% endif %}
+  · <a href="{{ url_for('source', source_id=r.source_id) }}">source details</a></p>
+
+<div class="grid">
+<div>
+  <div class="card">
+  {% if r.source_type == 'marco_polo' %}
+    <video controls preload="metadata" src="{{ url_for('media_source', source_id=r.source_id) }}"></video>
+    <p class="muted">Duration {{ '%.1f'|format(r.duration or 0) }} s · {{ r.speaker_verification }}</p>
+  {% else %}
+    {% for p in detail.get('pages', []) %}
+      <p class="muted">Page {{ p }}</p>
+      <img class="page" src="{{ url_for('media_page', source_id=r.source_id, page=p) }}" alt="scan of page {{ p }}">
+    {% endfor %}
+  {% endif %}
+  </div>
+</div>
+
+<div>
+  <div class="card">
+    <h3>Open and past review items</h3>
+    {% if not items %}<p class="muted">None.</p>{% endif %}
+    {% for i in items %}
+      <div>
+        <span class="pill {{ 'open' if i.status == 'open' else '' }}">{{ i.kind }} · {{ i.status }}</span> {{ i.reason }}
+        {% if i.status == 'open' %}
+        <form method="post" action="{{ url_for('resolve', item_id=i.id) }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="next" value="{{ url_for('record', record_id=r.record_id) }}">
+          <button>Mark checked</button>
+        </form>
+        {% endif %}
+        {% if i.details %}<details><summary class="muted">details</summary><pre>{{ i.details|fromjson|tojson(indent=2) }}</pre></details>{% endif %}
+      </div>
+    {% endfor %}
+    <form method="post" action="{{ url_for('approve', record_id=r.record_id) }}" style="margin-top:10px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button>Approve record (resolves all its open items)</button>
+    </form>
+  </div>
+
+  <form class="card" method="post" action="{{ url_for('correct', record_id=r.record_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h3>Date and time</h3>
+    <label>Date <input type="text" name="date" value="{{ e.date or '' }}" placeholder="YYYY-MM-DD, YYYY-MM or YYYY; blank = undated"></label>
+    <label>Time <input type="text" name="time" value="{{ e.time or '' }}" placeholder="HH:MM; blank = unknown"></label>
+    <label>Timezone <input type="text" name="timezone" value="{{ e.timezone or '' }}"></label>
+    <label>Confidence
+      <select name="timestamp_confidence">
+        {% for c in ['exact', 'inferred', 'unknown'] %}<option {{ 'selected' if e.timestamp_confidence == c else '' }}>{{ c }}</option>{% endfor %}
+      </select></label>
+    {% if evidence %}<details><summary class="muted">timestamp evidence</summary><pre>{{ evidence|tojson(indent=2) }}</pre></details>{% endif %}
+
+    <h3>Transcript</h3>
+    <p class="muted">Edit to correct. The machine transcript below is preserved; saving stores your version separately.</p>
+    <textarea name="transcript">{{ e.transcript or '' }}</textarea>
+    <label>Note <input type="text" name="note" size="50" placeholder="optional: why this changed"></label>
+    <button>Save corrections</button>
+  </form>
+
+  <div class="card">
+    <details><summary>Machine transcript (raw, never modified)</summary><pre>{{ r.raw_transcript or '(none)' }}</pre></details>
+    {% if detail.get('uncertain_segments') %}
+    <details><summary>Low-confidence passages</summary>
+      <ul>{% for s in detail.uncertain_segments %}<li>{{ s.start }}–{{ s.end }} s: “{{ s.text }}” <span class="muted">({{ s.why }})</span></li>{% endfor %}</ul>
+    </details>{% endif %}
+    {% if corrections %}
+    <details><summary>Correction history ({{ corrections|length }})</summary>
+      <table>{% for c in corrections %}<tr><td class="muted">{{ c.at }}</td><td>{{ c.field }}</td><td><pre>{{ c.old_value }}</pre></td><td><pre>{{ c.new_value }}</pre></td><td>{{ c.note or '' }}</td></tr>{% endfor %}</table>
+    </details>{% endif %}
+    {% if locations|length > 1 %}<details><summary>All copies of this file</summary><ul>{% for l in locations %}<li><code>{{ l }}</code></li>{% endfor %}</ul></details>{% endif %}
+  </div>
+</div>
+</div>
+{% endblock %}
