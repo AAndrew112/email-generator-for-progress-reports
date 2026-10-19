@@ -44,6 +44,19 @@ def discover(input_dir: Path, extensions: list[str]) -> list[Path]:
     return sorted(found)
 
 
+def icloud_placeholders(input_dir: Path, extensions: list[str]) -> list[Path]:
+    """Videos iCloud has not downloaded yet (macOS keeps ``.name.mp4.icloud`` stubs).
+
+    These are not readable videos, so they are reported instead of silently skipped.
+    """
+    exts = {e.lower() for e in extensions}
+    return sorted(
+        p
+        for p in input_dir.rglob(".*.icloud")
+        if p.is_file() and Path(p.name[1 : -len(".icloud")]).suffix.lower() in exts
+    )
+
+
 def filename_hints(path: Path, root: Path) -> dict[str, Any]:
     """Recorded as context only. Filenames never decide ownership."""
     rel = path.relative_to(root)
@@ -107,6 +120,14 @@ class MarcoPoloPipeline:
         if limit:
             files = files[:limit]
         log.info("Found %d video files under %s", len(files), self.root)
+        stubs = icloud_placeholders(self.root, self.mp.video_extensions)
+        if stubs:
+            log.warning(
+                "%d video(s) are still in iCloud only and were NOT processed. Download them "
+                "(Finder: right-click the folder > Download Now) and run again: %s",
+                len(stubs),
+                ", ".join(p.name[1 : -len(".icloud")] for p in stubs[:10]),
+            )
         self.sidecars = SidecarIndex(self.root, self.mp.video_extensions)
         progress = Progress(len(files), "marco_polo")
         seen: dict[str, Path] = {}

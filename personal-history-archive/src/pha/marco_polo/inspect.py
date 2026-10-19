@@ -17,7 +17,7 @@ from typing import Any
 
 from ..config import Config
 from ..media import all_tags, duration_seconds, has_audio, probe, require_ffmpeg
-from .pipeline import discover
+from .pipeline import discover, icloud_placeholders
 from .sidecar import SidecarIndex
 from .timestamps import find_candidates
 
@@ -124,6 +124,9 @@ def inspect_export(cfg: Config, sample: int | None = 200) -> dict[str, Any]:
         "inspected_at": datetime.now(timezone.utc).isoformat(),
         "total_files": len(all_files),
         "video_files": len(videos),
+        "icloud_not_downloaded": [
+            str(p.relative_to(root)) for p in icloud_placeholders(root, cfg.marco_polo.video_extensions)
+        ],
         "videos_probed": len(sampled),
         "extensions": dict(ext_counts.most_common()),
         "folders_with_videos": dict(dirs.most_common(30)),
@@ -158,6 +161,15 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Videos with sidecar metadata: {report['videos_with_sidecar_metadata']}",
         f"- Videos without audio: {report['videos_without_audio']}",
         "",
+    ]
+    if report["icloud_not_downloaded"]:
+        L += [
+            f"**{len(report['icloud_not_downloaded'])} video(s) are in iCloud only and were not "
+            "inspected.** In Finder, right-click the folder and choose Download Now, then run "
+            "this again.",
+            "",
+        ]
+    L += [
         "## File types",
         *[f"- `{k}`: {v}" for k, v in report["extensions"].items()],
         "",

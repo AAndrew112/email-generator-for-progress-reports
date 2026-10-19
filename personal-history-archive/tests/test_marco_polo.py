@@ -211,3 +211,19 @@ def test_inspect_report(cfg, db, export_dir):
     assert report["date_fields"]["container_tag:creation_time"]["verdict"].startswith("LIKELY EXPORT")
     assert "sender.name" in report["possible_sender_fields"]["sidecar"]
     assert "Possible sender fields" in render_markdown(report)
+
+
+def test_icloud_placeholders_reported_not_silently_skipped(cfg, db, tmp_path, caplog):
+    from pha.marco_polo.inspect import inspect_export, render_markdown
+
+    root = tmp_path / "exports"
+    make_video(root / "Voice videos" / "downloaded.mov", mtime=OLD)
+    (root / "Voice videos" / ".not yet.mov.icloud").write_bytes(b"bplist00")
+    (root / "Voice videos" / ".notes.txt.icloud").write_bytes(b"bplist00")
+    report = inspect_export(cfg)
+    assert report["video_files"] == 1
+    assert report["icloud_not_downloaded"] == ["Voice videos/.not yet.mov.icloud"]
+    assert "in iCloud only" in render_markdown(report)
+    with caplog.at_level("WARNING", logger="pha"):
+        run(cfg, db)
+    assert "not yet.mov" in caplog.text and "NOT processed" in caplog.text

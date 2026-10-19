@@ -52,6 +52,15 @@ journals, set `vision.backend = "manual"` and type pages in the review UI.
 
 1. Put your exported videos (any folder structure) under the folder named in
    `marco_polo.input_dir`.
+   Videos already in iCloud Drive can be used where they are. On a Mac, set
+   `input_dir = "~/Library/Mobile Documents/com~apple~CloudDocs/Voice videos"`.
+   On Windows, iCloud Drive is usually `C:\Users\<you>\iCloudDrive`. The
+   folder is only read. Keep `data_dir` on a local disk outside iCloud so the
+   database and transcripts are not synced. If "Optimize Mac Storage" is on,
+   right-click the folder in Finder and choose **Download Now** first. Videos
+   that exist only in iCloud are listed in the reports and skipped until
+   they are downloaded.
+
 2. **Inspect before trusting anything.**
 
    ```bash
