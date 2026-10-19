@@ -22,6 +22,7 @@ from ..runtime import Progress
 from ..transcribe import Transcriber, make_transcriber
 from ..voice import Embedder, VoiceDecision, VoiceProfiles, build_profiles, make_embedder, score
 from . import timestamps
+from .filenames import parse_filename
 from .sidecar import SidecarIndex, sidecar_values
 
 log = logging.getLogger("pha.mp")
@@ -183,6 +184,7 @@ class MarcoPoloPipeline:
                 "has_audio": has_audio(info),
                 "file_mtime_utc": _mtime(path).isoformat(),
                 "filename_hints": filename_hints(path, self.root),
+                "filename_fields": parse_filename(path.stem, self.mp.filename_pattern),
             }
             self.db.update_source(source_id, metadata_json=meta, stage=stage)
 
@@ -214,7 +216,7 @@ class MarcoPoloPipeline:
 
             stage = "timestamp"
             record_id = f"mp-{src['sha256'][:16]}"
-            ts = self._timestamp(path, tags, sidecar)
+            ts = self._timestamp(path, tags, sidecar, meta["filename_fields"])
             self.db.upsert_machine_record(
                 record_id,
                 source_id=source_id,
@@ -256,7 +258,10 @@ class MarcoPoloPipeline:
         detail: dict[str, Any] = {"filename_hints": meta["filename_hints"], "method": None}
         votes = []
         for rule in self.mp.ownership_rules:
-            if rule.kind == "container_tag":
+            if rule.kind == "filename":
+                v = meta["filename_fields"].get(rule.name)
+                values = [v] if v else []
+            elif rule.kind == "container_tag":
                 values = [tags[rule.name]] if tags.get(rule.name) else []
             elif rule.kind == "sidecar":
                 values = sidecar_values(sidecar, rule.name)
@@ -269,6 +274,7 @@ class MarcoPoloPipeline:
                         "field": f"{rule.kind}:{rule.name}",
                         "value": v,
                         "decision": "owner" if v.strip().lower() in owners else "other",
+                        "verified": rule.kind != "filename" or rule.spot_checked,
                     }
                 )
         detail["metadata_votes"] = votes
@@ -293,6 +299,18 @@ class MarcoPoloPipeline:
                     **detail,
                     "reason": f"metadata says '{decision}' but voice check says '{voice.decision}'",
                 }
+            if not any(v["verified"] for v in votes):
+                # A file name alone is not proof of who is speaking.
+                if voice is not None and voice.decision == decision:
+                    detail["method"] = "filename+voice"
+                    return decision, {**detail, "reason": "file-name sender confirmed by voice"}
+                why = (
+                    f"file name says '{decision}' but is not verified yet: spot-check a sample "
+                    "and set spot_checked = true, or add voice samples"
+                )
+                if voice is not None:
+                    why = f"file name says '{decision}'; voice check inconclusive ({voice.reason})"
+                return "uncertain", {**detail, "reason": why}
             detail["method"] = "metadata"
             return decision, {**detail, "reason": "sender metadata"}
 
@@ -307,8 +325,10 @@ class MarcoPoloPipeline:
             why += "; video has no audio track"
         return "uncertain", {**detail, "reason": why}
 
-    def _timestamp(self, path: Path, tags: dict[str, str], sidecar: list[dict]) -> timestamps.ResolvedTimestamp:
-        return timestamps.resolve(self.mp, tags, sidecar, _mtime(path))
+    def _timestamp(
+        self, path: Path, tags: dict[str, str], sidecar: list[dict], filename: dict[str, str]
+    ) -> timestamps.ResolvedTimestamp:
+        return timestamps.resolve(self.mp, tags, sidecar, _mtime(path), filename)
 
     def _queue_date_review(self, record_id: str, ts: timestamps.ResolvedTimestamp) -> None:
         if ts.review_reason:
@@ -335,6 +355,7 @@ class MarcoPoloPipeline:
             meta.get("container_tags", {}),
             self.sidecars.lookup(path),
             datetime.fromisoformat(meta["file_mtime_utc"]),
+            parse_filename(path.stem, self.mp.filename_pattern),
         )
         for rec in self.db.records_for_source(source_id):
             self.db.upsert_machine_record(
@@ -436,9 +457,12 @@ def _speaker_label(decision: str, detail: dict[str, Any]) -> str:
         return f"unverified ({detail.get('reason', 'uncertain')})"
     if method == "manual":
         return "owner: confirmed in manual review"
-    if method == "metadata":
+    if method in ("metadata", "filename+voice"):
         fields = ", ".join(f"{v['field']}={v['value']}" for v in detail.get("metadata_votes", []))
         label = f"owner: sender metadata ({fields})"
+        if method == "filename+voice":
+            v = detail.get("voice", {})
+            return f"owner: file-name sender ({fields}) confirmed by voice (similarity {v.get('similarity')})"
         voice = detail.get("voice")
         if voice and voice.get("decision") == "owner":
             label += f"; voice agrees (similarity {voice.get('similarity')})"

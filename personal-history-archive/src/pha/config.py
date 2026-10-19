@@ -12,6 +12,8 @@ from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
 from typing import Any
 
+from .marco_polo.filenames import DEFAULT_PATTERN as DEFAULT_FILENAME_PATTERN
+
 
 @dataclass
 class TimestampSourceRule:
@@ -20,6 +22,7 @@ class TimestampSourceRule:
     ``kind`` is one of:
       - ``container_tag``: an ffprobe format/stream tag (e.g. ``creation_time``)
       - ``sidecar``: a key inside a sidecar JSON/CSV manifest
+      - ``filename``: a field parsed from the file name (``timestamp``)
     """
 
     kind: str
@@ -35,16 +38,24 @@ class OwnershipMetadataRule:
     The video is mine when the field value (case-insensitive) is in
     ``owner_values``, and someone else's when it holds any other non-empty
     value. Only configure this after ``pha mp inspect`` has shown the field.
+
+    A ``filename`` rule is not trusted on its own: until ``spot_checked`` is
+    true (you watched a sample of videos and the names matched who was
+    speaking), its answer only counts when voice verification agrees.
     """
 
-    kind: str  # "container_tag" or "sidecar"
+    kind: str  # "container_tag", "sidecar" or "filename"
     name: str
     owner_values: list[str] = field(default_factory=list)
+    spot_checked: bool = False
 
 
 @dataclass
 class MarcoPoloConfig:
     input_dir: str = ""
+    # Regex with named groups (date, time, tz, sender) for metadata in file
+    # names. The default matches Marco Polo's chat export naming.
+    filename_pattern: str = DEFAULT_FILENAME_PATTERN
     video_extensions: list[str] = field(
         default_factory=lambda: [".mp4", ".mov", ".m4v", ".3gp", ".webm", ".mkv"]
     )

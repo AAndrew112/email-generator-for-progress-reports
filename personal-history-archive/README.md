@@ -86,6 +86,29 @@ journals, set `vision.backend = "manual"` and type pages in the review UI.
    name = "com.apple.quicktime.creationdate"
    ```
 
+   **Marco Polo chat exports** name each video
+   `YYYY-MM-DD_HH-MM-SS_<TZ>_<First>_<Initial>.mp4`, for example
+   `2026-04-28_05-07-33_PDT_Evelyn_E.mp4`. The report's "Metadata in file
+   names" section lists every sender with three example files each. Watch
+   a few, and if the names match who is speaking, add:
+
+   ```toml
+   [[marco_polo.ownership_rules]]
+   kind = "filename"
+   name = "sender"
+   owner_values = ["Amanda W"]   # your name exactly as the report shows it
+   spot_checked = true
+
+   [[marco_polo.timestamp_rules]]
+   kind = "filename"
+   name = "timestamp"
+   ```
+
+   Without `spot_checked = true`, a file-name sender only counts when voice
+   verification agrees; otherwise the video goes to review. The timezone
+   abbreviation (e.g. `PDT`) becomes a UTC offset, and the abbreviation as
+   written is kept in the evidence.
+
 4. **If there is no reliable sender field**, use voice verification:
    - Put at least three recordings that you have checked are only you
      speaking in `voice.owner_samples_dir` (videos or audio).

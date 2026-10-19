@@ -89,7 +89,12 @@ def _looks_like_export_time(dt: datetime, mtime: datetime, window_hours: float) 
     return abs(dt - mtime) <= timedelta(hours=window_hours)
 
 
-def _rule_values(rule: TimestampSourceRule, tags: dict[str, str], sidecar: list[dict]) -> list[str]:
+def _rule_values(
+    rule: TimestampSourceRule, tags: dict[str, str], sidecar: list[dict], filename: dict[str, str]
+) -> list[str]:
+    if rule.kind == "filename":
+        v = filename.get(rule.name)
+        return [v] if v else []
     if rule.kind == "container_tag":
         v = tags.get(rule.name)
         return [v] if v else []
@@ -99,7 +104,11 @@ def _rule_values(rule: TimestampSourceRule, tags: dict[str, str], sidecar: list[
 
 
 def find_candidates(
-    tags: dict[str, str], sidecar: list[dict], mtime: datetime, window_hours: float
+    tags: dict[str, str],
+    sidecar: list[dict],
+    mtime: datetime,
+    window_hours: float,
+    filename: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Every metadata value that parses as a date-time, with plausibility notes."""
     found: list[dict[str, Any]] = []
@@ -122,6 +131,8 @@ def find_candidates(
             }
         )
 
+    for name, value in (filename or {}).items():
+        consider("filename", name, value)
     for name, value in tags.items():
         consider("container_tag", name, value)
     for entry in sidecar:
@@ -135,13 +146,15 @@ def resolve(
     tags: dict[str, str],
     sidecar: list[dict],
     mtime: datetime,
+    filename: dict[str, str] | None = None,
 ) -> ResolvedTimestamp:
     """Pick the recording time from confirmed rules, or leave it unknown."""
-    candidates = find_candidates(tags, sidecar, mtime, cfg.contamination_window_hours)
+    filename = filename or {}
+    candidates = find_candidates(tags, sidecar, mtime, cfg.contamination_window_hours, filename)
     rejected: list[dict[str, Any]] = []
 
     for rule in cfg.timestamp_rules:
-        for raw in _rule_values(rule, tags, sidecar):
+        for raw in _rule_values(rule, tags, sidecar, filename):
             dt = parse_datetime(raw, rule.format)
             if dt is None:
                 rejected.append({"rule": rule.name, "value": raw, "why": "unparseable"})
@@ -155,7 +168,10 @@ def resolve(
             if problem:
                 rejected.append({"rule": rule.name, "value": raw, "why": problem})
                 continue
-            return _build(cfg, dt, rule, raw, candidates)
+            ts = _build(cfg, dt, rule, raw, candidates)
+            if rule.kind == "filename" and filename.get("tz_abbreviation"):
+                ts.evidence["tz_abbreviation_as_written"] = filename["tz_abbreviation"]
+            return ts
 
     reason = "no confirmed recording-time metadata"
     if rejected:

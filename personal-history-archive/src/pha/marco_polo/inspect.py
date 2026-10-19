@@ -17,6 +17,7 @@ from typing import Any
 
 from ..config import Config
 from ..media import all_tags, duration_seconds, has_audio, probe, require_ffmpeg
+from .filenames import parse_filename
 from .pipeline import discover, icloud_placeholders
 from .sidecar import SidecarIndex
 from .timestamps import find_candidates
@@ -81,7 +82,8 @@ def inspect_export(cfg: Config, sample: int | None = 200) -> dict[str, Any]:
                 sidecar_coverage[k] += 1
                 sidecar_examples[k][v[:120]] += 1
         mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
-        for c in find_candidates(tags, entries, mtime, cfg.marco_polo.contamination_window_hours):
+        fn = parse_filename(path.stem, cfg.marco_polo.filename_pattern)
+        for c in find_candidates(tags, entries, mtime, cfg.marco_polo.contamination_window_hours, fn):
             date_fields[f"{c['kind']}:{c['name']}"].append(c)
 
     date_analysis = {}
@@ -119,6 +121,32 @@ def inspect_export(cfg: Config, sample: int | None = 200) -> dict[str, Any]:
     }
 
     video_set = set(videos)
+    # File-name metadata is cheap to read, so cover every video, not a sample.
+    senders: Counter[str] = Counter()
+    sender_examples: dict[str, list[str]] = defaultdict(list)
+    tz_abbrevs: Counter[str] = Counter()
+    fn_dates: list[str] = []
+    for path in videos:
+        fn = parse_filename(path.stem, cfg.marco_polo.filename_pattern)
+        if not fn:
+            continue
+        if "sender" in fn:
+            senders[fn["sender"]] += 1
+            if len(sender_examples[fn["sender"]]) < 3:
+                sender_examples[fn["sender"]].append(str(path.relative_to(root)))
+        if "tz_abbreviation" in fn:
+            tz_abbrevs[fn["tz_abbreviation"]] += 1
+        if "timestamp" in fn:
+            fn_dates.append(fn["timestamp"][:10])
+    filename_metadata = {
+        "pattern": cfg.marco_polo.filename_pattern,
+        "videos_matching": sum(senders.values()) if senders else len(fn_dates),
+        "senders": dict(senders.most_common()),
+        "spot_check_examples": dict(sender_examples),
+        "timezone_abbreviations": dict(tz_abbrevs.most_common()),
+        "earliest_date": min(fn_dates) if fn_dates else None,
+        "latest_date": max(fn_dates) if fn_dates else None,
+    }
     return {
         "input_dir": str(root),
         "inspected_at": datetime.now(timezone.utc).isoformat(),
@@ -131,6 +159,7 @@ def inspect_export(cfg: Config, sample: int | None = 200) -> dict[str, Any]:
         "extensions": dict(ext_counts.most_common()),
         "folders_with_videos": dict(dirs.most_common(30)),
         "filename_patterns": dict(patterns.most_common(15)),
+        "filename_metadata": filename_metadata,
         "non_video_files": sorted(
             str(p.relative_to(root)) for p in all_files if p not in video_set
         )[:100],
@@ -176,6 +205,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         "## Filename patterns (9 = digit, a = letters)",
         *[f"- `{k}`: {v}" for k, v in report["filename_patterns"].items()],
         "",
+        "## Metadata in file names",
+        *_filename_section(report["filename_metadata"], report["video_files"]),
+        "",
         "## Sidecar manifests",
         *([f"- `{m}`" for m in report["sidecar_manifests"]] or ["- none found"]),
         "",
@@ -215,6 +247,25 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
     ]
     return "\n".join(L)
+
+
+def _filename_section(fm: dict[str, Any], total: int) -> list[str]:
+    if not fm["videos_matching"]:
+        return ["- no file names match `marco_polo.filename_pattern`"]
+    lines = [
+        f"- {fm['videos_matching']} of {total} videos match the pattern",
+        f"- dates in names: {fm['earliest_date']} .. {fm['latest_date']}",
+        f"- timezone abbreviations: {fm['timezone_abbreviations']}",
+        "- senders (videos each) and files to spot-check:",
+    ]
+    for sender, n in fm["senders"].items():
+        lines.append(f"  - **{sender}**: {n}")
+        lines += [f"    - `{e}`" for e in fm["spot_check_examples"].get(sender, [])]
+    lines.append(
+        "- Watch the examples: if each sender name matches who is speaking and the dates "
+        "look right, add the filename rules to config.toml (see README)."
+    )
+    return lines
 
 
 def write_report(cfg: Config, report: dict[str, Any]) -> tuple[Path, Path]:

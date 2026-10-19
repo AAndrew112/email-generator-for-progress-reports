@@ -22,7 +22,23 @@ assume_timezone = ""
 transcribe_uncertain = false
 
 # Add rules ONLY after `pha mp inspect` shows the field and you have checked it
-# against videos whose sender/date you know. Examples (disabled):
+# against videos whose sender/date you know.
+#
+# Marco Polo chat exports name files like 2026-04-28_05-07-33_PDT_Evelyn_E.mp4.
+# To use the sender and time in those names (write your name exactly as it
+# appears in the report's "Metadata in file names" section):
+#
+# [[marco_polo.ownership_rules]]
+# kind = "filename"
+# name = "sender"
+# owner_values = ["Amanda W"]
+# spot_checked = true         # only after watching a few examples per sender
+#
+# [[marco_polo.timestamp_rules]]
+# kind = "filename"
+# name = "timestamp"
+#
+# Other examples (disabled):
 #
 # [[marco_polo.ownership_rules]]
 # kind = "sidecar"            # or "container_tag"

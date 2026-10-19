@@ -227,3 +227,72 @@ def test_icloud_placeholders_reported_not_silently_skipped(cfg, db, tmp_path, ca
     with caplog.at_level("WARNING", logger="pha"):
         run(cfg, db)
     assert "not yet.mov" in caplog.text and "NOT processed" in caplog.text
+
+
+# ------------------------------------------------- Marco Polo file-name metadata
+def test_parse_marco_polo_filenames():
+    from pha.marco_polo.filenames import DEFAULT_PATTERN, parse_filename
+
+    assert parse_filename("2026-04-28_05-07-33_PDT_Evelyn_E", DEFAULT_PATTERN) == {
+        "sender": "Evelyn E", "tz_abbreviation": "PDT", "timestamp": "2026-04-28T05:07:33-07:00",
+    }
+    assert parse_filename("2025-12-01_20-00-00_PST_Amanda_W (1)", DEFAULT_PATTERN)["sender"] == "Amanda W"
+    assert parse_filename("2025-12-01_20-00-00_XYZT_Amanda_W", DEFAULT_PATTERN)["timestamp"] == "2025-12-01T20:00:00"
+    assert parse_filename("IMG_1234", DEFAULT_PATTERN) == {}
+
+
+@pytest.fixture
+def named_export(cfg, tmp_path):
+    root = tmp_path / "exports" / "Chat_1_of_4"
+    make_video(root / "2025-01-02_18-30-00_PST_Amanda_W.mp4", mtime=OLD)
+    make_video(root / "2025-01-03_09-00-00_PST_Evelyn_E.mp4", seconds=5, freqs=(OTHER_HZ,), mtime=OLD)
+    cfg.marco_polo.timestamp_rules = [TimestampSourceRule("filename", "timestamp")]
+    return root
+
+
+def test_unverified_filename_sender_goes_to_review(cfg, db, named_export):
+    cfg.marco_polo.ownership_rules = [OwnershipMetadataRule("filename", "sender", ["Amanda W"])]
+    _, t = run(cfg, db)
+    src = by_name(db)
+    assert {s["ownership"] for s in src.values()} == {"uncertain"}
+    assert "not verified yet" in json.loads(src["2025-01-02_18-30-00_PST_Amanda_W.mp4"]["ownership_detail"])["reason"]
+    assert t.calls == []
+
+
+def test_spot_checked_filename_sender_and_date(cfg, db, named_export):
+    cfg.marco_polo.ownership_rules = [
+        OwnershipMetadataRule("filename", "sender", ["Amanda W"], spot_checked=True)
+    ]
+    run(cfg, db)
+    src = by_name(db)
+    assert src["2025-01-02_18-30-00_PST_Amanda_W.mp4"]["ownership"] == "owner"
+    assert src["2025-01-03_09-00-00_PST_Evelyn_E.mp4"]["status"] == "excluded"
+    rec = db.all_records()[0]
+    assert (rec["machine_date"], rec["machine_time"], rec["machine_timezone"], rec["machine_confidence"]) == (
+        "2025-01-02", "18:30:00", "UTC-08:00", "exact")
+    assert json.loads(rec["timestamp_evidence"])["tz_abbreviation_as_written"] == "PST"
+    assert "filename:sender=Amanda W" in rec["speaker_verification"]
+
+
+def test_unverified_filename_sender_confirmed_by_voice(cfg, db, named_export, tmp_path):
+    for i in range(3):
+        make_video(tmp_path / "samples" / "me" / f"me{i}.mp4", seconds=3 + i, freqs=(OWNER_HZ,))
+    cfg.voice.enabled = True
+    cfg.voice.owner_samples_dir = "samples/me"
+    cfg.marco_polo.ownership_rules = [OwnershipMetadataRule("filename", "sender", ["Amanda W"])]
+    run(cfg, db, embedder=FakeEmbedder())
+    src = by_name(db)
+    assert src["2025-01-02_18-30-00_PST_Amanda_W.mp4"]["ownership"] == "owner"
+    assert src["2025-01-03_09-00-00_PST_Evelyn_E.mp4"]["ownership"] == "other"
+    assert "confirmed by voice" in db.all_records()[0]["speaker_verification"]
+
+
+def test_inspect_lists_filename_senders(cfg, db, named_export):
+    from pha.marco_polo.inspect import inspect_export, render_markdown
+
+    report = inspect_export(cfg)
+    fm = report["filename_metadata"]
+    assert fm["senders"] == {"Amanda W": 1, "Evelyn E": 1}
+    assert fm["timezone_abbreviations"] == {"PST": 2}
+    assert "filename:timestamp" in report["date_fields"]
+    assert "**Amanda W**" in render_markdown(report)
