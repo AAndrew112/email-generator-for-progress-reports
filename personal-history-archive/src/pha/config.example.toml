@@ -86,5 +86,6 @@ duplicate_page_distance = 6
 backend = "ollama"       # "ollama" (local), "manual", or "anthropic" (cloud, needs authorization)
 ollama_url = "http://127.0.0.1:11434"
 ollama_model = "qwen2.5vl:7b"
+ollama_num_ctx = 16384     # room per page; too small and long pages get cut off
 anthropic_model = ""
 timeout_seconds = 600

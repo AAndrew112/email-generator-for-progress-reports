@@ -27,6 +27,7 @@ log = logging.getLogger("pha.journals")
 SOURCE_TYPE = "journal"
 MAX_ATTEMPTS = 3
 BLANK_INK = 0.004
+TRUNCATED_NOTE = "model output hit its length limit; the end of the page may be missing"
 
 
 @dataclass
@@ -231,7 +232,7 @@ class JournalPipeline:
             return
         self._set_page(
             js.source_id, page, raw_text=result.text, backend=result.backend, model=result.model,
-            status="done", error=None,
+            status="done", error=TRUNCATED_NOTE if result.truncated else None,
         )
 
     # ------------------------------------------------------------- records
@@ -286,6 +287,14 @@ class JournalPipeline:
                     f"{len(markers)} illegible/uncertain passage(s) marked",
                     record_id=record_id,
                     details={"markers": markers},
+                )
+            cut = [p["page_number"] for p in backend_rows if p["error"] == TRUNCATED_NOTE]
+            if cut:
+                self.db.add_review(
+                    "transcription",
+                    "transcription may be cut off before the end of the page",
+                    record_id=record_id,
+                    details={"pages": cut},
                 )
 
         # Pages awaiting a human transcription become one record each.

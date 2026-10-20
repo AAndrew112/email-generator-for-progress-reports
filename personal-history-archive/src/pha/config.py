@@ -136,6 +136,10 @@ class VisionConfig:
     backend: str = "ollama"
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5vl:7b"
+    # Context window per page. A full-page scan uses thousands of tokens of
+    # image data; Ollama's small default makes long pages stop part-way.
+    ollama_num_ctx: int = 16384
+    ollama_num_predict: int = 8192
     # Required when backend = "anthropic"; set it to the model you choose.
     anthropic_model: str = ""
     timeout_seconds: int = 600

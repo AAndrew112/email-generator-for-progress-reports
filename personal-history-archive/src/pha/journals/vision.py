@@ -48,6 +48,8 @@ class PageTranscription:
     text: str
     backend: str
     model: str
+    # True when the model hit its output/context limit, so the page may be cut off.
+    truncated: bool = False
 
 
 class VisionBackend(Protocol):
@@ -68,6 +70,11 @@ class OllamaBackend:
         self.url = cfg.vision.ollama_url.rstrip("/")
         self.model = cfg.vision.ollama_model
         self.timeout = cfg.vision.timeout_seconds
+        self.options = {
+            "temperature": 0,
+            "num_ctx": cfg.vision.ollama_num_ctx,
+            "num_predict": cfg.vision.ollama_num_predict,
+        }
         host = self.url.split("://", 1)[-1].split("/", 1)[0].split(":", 1)[0]
         if host not in ("127.0.0.1", "localhost", "::1", "[::1]") and not cfg.cloud_ai_authorized:
             raise CloudNotAuthorized(
@@ -84,12 +91,18 @@ class OllamaBackend:
                 "prompt": PROMPT,
                 "images": [b64],
                 "stream": False,
-                "options": {"temperature": 0},
+                "options": self.options,
             },
             timeout=self.timeout,
         )
         resp.raise_for_status()
-        return PageTranscription(strip_wrapping(resp.json().get("response", "")), self.name, self.model)
+        body = resp.json()
+        return PageTranscription(
+            strip_wrapping(body.get("response", "")),
+            self.name,
+            self.model,
+            truncated=body.get("done_reason") == "length",
+        )
 
 
 class ManualBackend:
@@ -135,7 +148,9 @@ class AnthropicBackend:
         if response.stop_reason == "refusal":
             raise RuntimeError(f"Model declined to transcribe {image_path.name}")
         text = "".join(b.text for b in response.content if b.type == "text")
-        return PageTranscription(strip_wrapping(text), self.name, self.model)
+        return PageTranscription(
+            strip_wrapping(text), self.name, self.model, truncated=response.stop_reason == "max_tokens"
+        )
 
 
 def make_backend(cfg: Config) -> VisionBackend:

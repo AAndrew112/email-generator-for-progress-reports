@@ -253,3 +253,45 @@ def test_drive_token_with_broader_scope_refused(tmp_path):
     }))
     with pytest.raises(RuntimeError, match="only drive.readonly"):
         gdrive.get_service(tmp_path / "client_secret.json", token)
+
+
+def test_ollama_sends_large_context_and_detects_cutoff(cfg, tmp_path, monkeypatch):
+    import pha.journals.vision as vision
+
+    sent = {}
+
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"response": "```\nDear Diary, today we\n```", "done_reason": "length"}
+
+    def fake_post(url, json, timeout):
+        sent.update(json)
+        return Resp()
+
+    monkeypatch.setattr(vision.requests, "post", fake_post)
+    img = tmp_path / "p.png"
+    img.write_bytes(b"png")
+    result = OllamaBackend(cfg).transcribe(img)
+    assert sent["options"]["num_ctx"] == 16384 and sent["options"]["num_predict"] == 8192
+    assert result.truncated and result.text == "Dear Diary, today we"
+
+
+def test_cut_off_page_is_queued_for_review(cfg, db, tmp_path):
+    from pha.journals.vision import PageTranscription
+
+    pdf = _setup(cfg, tmp_path)
+    sid = "jr-" + sha256_file(pdf)[:16]
+    script = _vision(sid).script
+
+    class CutOff(FakeVision):
+        def transcribe(self, image_path):
+            r = super().transcribe(image_path)
+            return PageTranscription(r.text, r.backend, r.model, truncated=image_path.stem == "p0003")
+
+    JournalPipeline(cfg, db, backend_factory=lambda: CutOff(script)).run(source="local")
+    items = [i for i in db.review_items("open", "transcription") if "cut off" in i["reason"]]
+    assert len(items) == 1
+    assert db.get_record(items[0]["record_id"])["page_number"] == 3
