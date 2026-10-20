@@ -143,3 +143,32 @@ def test_real_voice_encoder_on_synthetic_speakers(cfg, db, tmp_path):
     assert own["dad.mp4"] == "other", detail["dad.mp4"]
     assert own["mixed.mp4"] != "owner", detail["mixed.mp4"]
 
+
+
+def test_whisper_gets_decoded_samples_not_a_path(tmp_path, monkeypatch):
+    """faster-whisper's PyAV decoder fails with newer PyAV; the wrapper must bypass it."""
+    import subprocess
+
+    import faster_whisper
+    import numpy as np
+
+    from pha.config import TranscriptionConfig
+    from pha.transcribe import FasterWhisperTranscriber
+
+    seen = {}
+
+    class FakeModel:
+        def __init__(self, *a, **kw):
+            pass
+
+        def transcribe(self, audio, **kw):
+            seen["audio"] = audio
+            return iter([]), type("Info", (), {"language": "en"})()
+
+    monkeypatch.setattr(faster_whisper, "WhisperModel", FakeModel)
+    wav = tmp_path / "a.wav"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=300:duration=1",
+                    "-ar", "16000", "-ac", "1", str(wav)], check=True)
+    FasterWhisperTranscriber(TranscriptionConfig()).transcribe(wav)
+    assert isinstance(seen["audio"], np.ndarray) and seen["audio"].dtype == np.float32
+    assert len(seen["audio"]) == 16000

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .config import TranscriptionConfig
+from .media import load_wav
 
 
 @dataclass
@@ -40,8 +41,10 @@ class FasterWhisperTranscriber:
 
     def transcribe(self, wav_path: Path) -> TranscriptResult:
         cfg = self.cfg
+        # Pass samples, not a path: faster-whisper's own decoder fails with newer
+        # PyAV releases (seen with 19), and the audio is already 16 kHz mono.
         segments_iter, info = self.model.transcribe(
-            str(wav_path),
+            load_wav(wav_path),
             language=cfg.language or None,
             beam_size=cfg.beam_size,
             temperature=0.0,
