@@ -172,3 +172,15 @@ def test_whisper_gets_decoded_samples_not_a_path(tmp_path, monkeypatch):
     FasterWhisperTranscriber(TranscriptionConfig()).transcribe(wav)
     assert isinstance(seen["audio"], np.ndarray) and seen["audio"].dtype == np.float32
     assert len(seen["audio"]) == 16000
+
+
+def test_progress_summary_groups_outcomes():
+    from pha.runtime import Progress
+
+    p = Progress(4, "marco_polo")
+    for outcome in ["transcribed (812 words)", "transcribed (95 words)", "excluded (not my video)",
+                    "failed at transcription: boom"]:
+        p.step("x.mp4", outcome)
+    assert p.summary() == (
+        "marco_polo: 4/4 processed (excluded (not my video)=1, failed at transcription=1, transcribed=2)"
+    )

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 import sys
 import time
 from contextlib import contextmanager
@@ -43,7 +44,9 @@ class Progress:
 
     def step(self, name: str, outcome: str) -> None:
         self.done += 1
-        self.counts[outcome] = self.counts.get(outcome, 0) + 1
+        # Group "transcribed (812 words)" and "transcribed (95 words)" together.
+        kind = re.sub(r"\s*\([^)]*\d[^)]*\)", "", outcome).split(":")[0].strip()
+        self.counts[kind] = self.counts.get(kind, 0) + 1
         elapsed = time.monotonic() - self.start
         eta = ""
         if self.done and self.done < self.total:
