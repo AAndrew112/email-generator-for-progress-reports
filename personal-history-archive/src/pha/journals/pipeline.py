@@ -10,6 +10,7 @@ from __future__ import annotations
 import difflib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -188,8 +189,14 @@ class JournalPipeline:
         n_pages = page_count(js.local_pdf)
         failed = 0
         for p in range(1, n_pages + 1):
+            started = time.monotonic()
             try:
-                self._page(js, p, force)
+                outcome = self._page(js, p, force)
+                if outcome != "already done":
+                    log.info(
+                        "  %s page %d/%d: %s (%.0fs)",
+                        js.filename, p, n_pages, outcome, time.monotonic() - started,
+                    )
             except Exception as exc:
                 failed += 1
                 log.exception("Page %d of %s failed", p, js.filename)
@@ -214,26 +221,28 @@ class JournalPipeline:
                 (source_id, page, *values.values()),
             )
 
-    def _page(self, js: JournalSource, page: int, force: bool) -> None:
+    def _page(self, js: JournalSource, page: int, force: bool) -> str:
         row = self.db.conn.execute(
             "SELECT * FROM journal_pages WHERE source_id = ? AND page_number = ?", (js.source_id, page)
         ).fetchone()
         if row and row["status"] == "done" and not force:
-            return
+            return "already done"
         png = render_page(js.local_pdf, page, self.page_cache / js.source_id / f"p{page:04d}.png", self.jc.render_dpi)
         ink = ink_ratio(png)
         self._set_page(js.source_id, page, image_path=str(png), phash=dhash(png), ink_ratio=ink)
         if ink < BLANK_INK:
             self._set_page(js.source_id, page, raw_text="[blank page]", backend="ink-check", model="", status="done", error=None)
-            return
+            return "blank page"
         result = self.backend.transcribe(png)
         if result is None:
             self._set_page(js.source_id, page, status="manual_needed", backend=self.backend.name, error=None)
-            return
+            return "needs manual transcription"
         self._set_page(
             js.source_id, page, raw_text=result.text, backend=result.backend, model=result.model,
             status="done", error=TRUNCATED_NOTE if result.truncated else None,
         )
+        outcome = f"transcribed ({len(result.text.split())} words)"
+        return outcome + ", may be cut off" if result.truncated else outcome
 
     # ------------------------------------------------------------- records
     def build_records(self, source_id: str) -> int:

@@ -295,3 +295,12 @@ def test_cut_off_page_is_queued_for_review(cfg, db, tmp_path):
     items = [i for i in db.review_items("open", "transcription") if "cut off" in i["reason"]]
     assert len(items) == 1
     assert db.get_record(items[0]["record_id"])["page_number"] == 3
+
+
+def test_each_page_is_reported_as_it_finishes(cfg, db, tmp_path, caplog):
+    pdf = _setup(cfg, tmp_path)
+    sid = "jr-" + sha256_file(pdf)[:16]
+    with caplog.at_level("INFO", logger="pha"):
+        JournalPipeline(cfg, db, backend_factory=lambda: _vision(sid)).run(source="local")
+    assert "journal 1998 part 1.pdf page 1/3: transcribed (" in caplog.text
+    assert "page 3/3" in caplog.text
