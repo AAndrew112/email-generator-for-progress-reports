@@ -10,6 +10,7 @@ final class LifeLogUITests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["-uiTesting"]
         app.launch()
+        snapshot("00-launch-\(name)")
     }
 
     private func snapshot(_ name: String) {
