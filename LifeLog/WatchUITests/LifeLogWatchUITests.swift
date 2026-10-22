@@ -20,7 +20,7 @@ final class LifeLogWatchUITests: XCTestCase {
     }
 
     private func button(containing text: String) -> XCUIElement {
-        app.buttons.containing(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
 
     @discardableResult
@@ -35,7 +35,8 @@ final class LifeLogWatchUITests: XCTestCase {
 
     func testOneTapFavorite() {
         let pickup = button(containing: "Automatic pickup")
-        XCTAssertTrue(pickup.waitForExistence(timeout: 20) || scrollTo(pickup))
+        XCTAssertTrue(app.buttons.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(scrollTo(pickup))
         pickup.tap()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 4), "toast with Undo after one tap")
         snapshot("w01-logged")
@@ -43,10 +44,11 @@ final class LifeLogWatchUITests: XCTestCase {
 
     func testAnswerToSave() {
         let episode = button(containing: "Scrolling episode")
-        XCTAssertTrue(episode.waitForExistence(timeout: 20) || scrollTo(episode))
+        XCTAssertTrue(episode.waitForExistence(timeout: 20))
         episode.tap()
         let fifteen = button(containing: "15 min")
-        XCTAssertTrue(fifteen.waitForExistence(timeout: 4) || scrollTo(fifteen))
+        XCTAssertTrue(app.buttons.firstMatch.waitForExistence(timeout: 4))
+        XCTAssertTrue(scrollTo(fifteen))
         snapshot("w02-duration")
         fifteen.tap()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 4), "answering the required field saves")

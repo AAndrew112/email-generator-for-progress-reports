@@ -126,7 +126,7 @@ jobs:
         working-directory: LifeLog
         run: python3 scripts/ci_report.py crashes || true
       - name: Publish screenshots
-        if: always()
+        if: failure() || github.event_name == 'workflow_dispatch'
         working-directory: LifeLog
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -186,4 +186,6 @@ jobs:
           xcrun xcresulttool export attachments --path build/WatchUITests.xcresult --output-path build/screenshots > /dev/null || true
           python3 scripts/ci_report.py failures build/WatchUITests.xcresult || true
           python3 scripts/ci_report.py crashes || true
-          python3 scripts/ci_report.py publish build/screenshots "LifeLog Watch screenshots" || true
+          if [ "${{ job.status }}" != "success" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 scripts/ci_report.py publish build/screenshots "LifeLog Watch screenshots" || true
+          fi
