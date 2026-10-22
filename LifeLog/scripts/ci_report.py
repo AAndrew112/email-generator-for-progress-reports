@@ -87,7 +87,7 @@ def crashes():
         print(f"::error title=Crash {escape(os.path.basename(path))}::{escape(msg)[:60000]}")
 
 
-def publish(directory):
+def publish(directory, prefix="LifeLog UI screenshots"):
     """Attaches screenshots to the commit as neutral check runs (base64 JPEG in the output text),
     so they can be reviewed without downloading artifacts."""
     import urllib.request
@@ -117,7 +117,7 @@ def publish(directory):
         groups.append(current)
     for i, blocks in enumerate(groups):
         body = json.dumps({
-            "name": f"LifeLog UI screenshots {i + 1}/{len(groups)}", "head_sha": sha, "status": "completed",
+            "name": f"{prefix} {i + 1}/{len(groups)}", "head_sha": sha, "status": "completed",
             "conclusion": "neutral",
             "output": {"title": "UI test screenshots", "summary": "Base64 JPEG screenshots from the UI tests.",
                        "text": "".join(blocks)}}).encode()
@@ -132,7 +132,7 @@ def publish(directory):
 
 if __name__ == "__main__":
     if sys.argv[1] == "publish":
-        publish(sys.argv[2])
+        publish(sys.argv[2], *sys.argv[3:4])
     elif sys.argv[1] == "crashes":
         crashes()
     elif sys.argv[1] == "failures":

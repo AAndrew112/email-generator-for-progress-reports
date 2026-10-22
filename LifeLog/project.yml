@@ -146,7 +146,22 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         SKIP_INSTALL: YES
-    scheme: {}
+    scheme:
+      testTargets:
+        - LifeLogWatchUITests
+
+  LifeLogWatchUITests:
+    type: bundle.ui-testing
+    platform: watchOS
+    sources:
+      - WatchUITests
+    dependencies:
+      - target: LifeLogWatch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LIFELOG_APP_BUNDLE_ID).watchkitapp.uitests
+        TEST_TARGET_NAME: LifeLogWatch
+        GENERATE_INFOPLIST_FILE: YES
 
   LifeLogWatchWidgets:
     type: app-extension

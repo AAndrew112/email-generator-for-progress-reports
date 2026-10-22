@@ -137,3 +137,53 @@ jobs:
           name: ui-screenshots
           path: LifeLog/build/screenshots
           if-no-files-found: ignore
+
+  watch-ui-tests:
+    name: UI tests (Watch simulator)
+    runs-on: macos-15
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+      - name: Pick a Watch simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          best = None
+          for runtime, items in devices.items():
+              if "watchOS" not in runtime:
+                  continue
+              for d in items:
+                  if d["name"].startswith("Apple Watch"):
+                      key = (runtime, d["name"])
+                      if best is None or key > best[0]:
+                          best = (key, d["udid"])
+          print(best[1] if best else "")
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices | grep "$UDID" || xcrun simctl list runtimes
+      - name: Run Watch UI tests
+        working-directory: LifeLog
+        run: |
+          set -o pipefail
+          xcodebuild test -project LifeLog.xcodeproj -scheme LifeLogWatch \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath build/WatchUITests.xcresult -derivedDataPath build/dd -quiet
+      - name: Report
+        if: always()
+        working-directory: LifeLog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p build/screenshots
+          xcrun xcresulttool export attachments --path build/WatchUITests.xcresult --output-path build/screenshots > /dev/null || true
+          python3 scripts/ci_report.py failures build/WatchUITests.xcresult || true
+          python3 scripts/ci_report.py crashes || true
+          python3 scripts/ci_report.py publish build/screenshots "LifeLog Watch screenshots" || true
