@@ -71,3 +71,53 @@ jobs:
           xcodebuild -project LifeLog.xcodeproj -scheme LifeLog -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build/dd-device CODE_SIGNING_ALLOWED=NO -quiet build
+
+  ui-tests:
+    name: UI tests (iPhone simulator)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+      - name: Pick an iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          best = None
+          for runtime, items in devices.items():
+              if "iOS" not in runtime:
+                  continue
+              for d in items:
+                  if d["name"].startswith("iPhone") and d.get("isAvailable", True):
+                      key = (runtime, "Pro" in d["name"], d["name"])
+                      if best is None or key > best[0]:
+                          best = (key, d["udid"])
+          print(best[1])
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices | grep "$UDID"
+      - name: Run UI tests
+        working-directory: LifeLog
+        run: |
+          set -o pipefail
+          xcodebuild test -project LifeLog.xcodeproj -scheme LifeLog \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath build/UITests.xcresult -derivedDataPath build/dd -quiet
+      - name: Export screenshots
+        if: always()
+        working-directory: LifeLog
+        run: |
+          mkdir -p build/screenshots
+          xcrun xcresulttool export attachments --path build/UITests.xcresult --output-path build/screenshots || true
+          ls -la build/screenshots || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-screenshots
+          path: LifeLog/build/screenshots
+          if-no-files-found: ignore

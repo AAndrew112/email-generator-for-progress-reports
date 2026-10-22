@@ -72,7 +72,23 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_CFBundleDisplayName: LifeLog
-    scheme: {}
+    scheme:
+      testTargets:
+        - LifeLogUITests
+
+  LifeLogUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: LifeLog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LIFELOG_APP_BUNDLE_ID).uitests
+        TEST_TARGET_NAME: LifeLog
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
 
   LifeLogWidgets:
     type: app-extension

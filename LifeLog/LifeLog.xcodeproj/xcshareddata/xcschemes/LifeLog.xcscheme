@@ -39,6 +39,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "76BA37F55576C5BC7E5BE4EF"
+               BuildableName = "LifeLogUITests.xctest"
+               BlueprintName = "LifeLogUITests"
+               ReferencedContainer = "container:LifeLog.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

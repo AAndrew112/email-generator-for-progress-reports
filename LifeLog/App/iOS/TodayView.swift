@@ -154,6 +154,7 @@ struct CheckInCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(kind.title), \(done == nil ? "not done" : "done")")
+        .accessibilityIdentifier("checkin-\(kind.rawValue)")
     }
 }
 
@@ -197,6 +198,7 @@ struct QuickTile: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityLabel("Log \(action.title)")
+        .accessibilityIdentifier("tile-\(action.title)")
         .accessibilityValue(count > 0 ? "\(count) today" : "")
     }
 }

@@ -11,7 +11,15 @@ enum StoreFactory {
         return id
     }()
 
+    /// UI tests launch with `-uiTesting` and get a fresh, throwaway database.
+    static let isUITesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
+
     static let containerURL: URL = {
+        if isUITesting {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("LifeLog-UITest", isDirectory: true)
+            try? FileManager.default.removeItem(at: dir)
+            return dir
+        }
         if let id = appGroupID,
            let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
             return url.appendingPathComponent("LifeLog", isDirectory: true)
@@ -28,6 +36,7 @@ enum StoreFactory {
     /// Stable per-install identifier recorded on every entry ("iphone-…", "watch-…").
     static let deviceID: String = {
         let key = "LifeLogDeviceID"
+        if isUITesting { return "uitest" }
         if let id = defaults.string(forKey: key) { return id }
         #if os(watchOS)
         let prefix = "watch"
