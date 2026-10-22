@@ -155,6 +155,8 @@ final class WatchSync: NSObject {
         } else {
             try? store.markSynced(receipt)
             lastError = nil
+            // Large backlogs go out in several batches; keep going until nothing is pending.
+            if store.hasPendingChanges { schedulePush() }
         }
     }
     #endif
