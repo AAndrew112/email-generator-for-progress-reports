@@ -85,7 +85,7 @@ If you'd rather not use Xcode for updates, use Product → Archive → Distribut
 | Any time | Scrolling episode → tap a duration chip. Tap Edit on the toast to add the app or trigger. | 2 |
 | Any time | Seborrheic dermatitis → tap a severity, then Edit to add locations or a photo. | 2+ |
 | Evening | Today → **Evening**. Eight ratings, one tap each. | about 9 |
-| Later | Tap any entry to change its time, values or note. Swipe to delete. History → ⋯ → Recently deleted restores it. | |
+| Later | Tap any entry to change its time, values or note. To delete, long-press it on Today or swipe it in History. History → ⋯ → Recently deleted restores it. | |
 
 To log something that happened earlier, tap +, turn on "Log at an earlier time", and pick
 the item. You can also edit the time on any entry.

@@ -20,8 +20,15 @@ final class LifeLogUITests: XCTestCase {
         add(attachment)
     }
 
-    private func toast(_ title: String) -> XCUIElement {
-        app.staticTexts[title].firstMatch
+    /// Lists are lazy: scroll until the element is materialised.
+    @discardableResult
+    private func scrollTo(_ element: XCUIElement, attempts: Int = 8) -> Bool {
+        var n = 0
+        while !element.exists && n < attempts {
+            app.swipeUp()
+            n += 1
+        }
+        return element.waitForExistence(timeout: 2)
     }
 
     func testOneTapLogUndo() {
@@ -91,14 +98,15 @@ final class LifeLogUITests: XCTestCase {
         snapshot("10-new-measure")
         app.buttons["Save"].tap()
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Took a walk'")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "new measure appears in the list")
+        XCTAssertTrue(app.navigationBars["Measures"].waitForExistence(timeout: 5), "editor closes after saving")
+        XCTAssertTrue(scrollTo(row), "new measure appears in the list")
         snapshot("10b-measure-saved")
     }
 
     func testExportProducesShareSheet() {
         app.tabBars.buttons["Settings"].tap()
         let export = app.buttons["Export CSV + JSON"]
-        XCTAssertTrue(export.waitForExistence(timeout: 5))
+        XCTAssertTrue(scrollTo(export), "export button is reachable")
         snapshot("11-settings")
         export.tap()
         let done = app.descendants(matching: .any)

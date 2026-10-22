@@ -22,6 +22,7 @@ struct MeasuresView: View {
                     Section(group) {
                         ForEach(measures(in: group)) { m in
                             Button { editorItem = EditorItem(measure: m, isNew: false) } label: { row(m) }
+                                .tint(.primary)
                                 .swipeActions(edge: .trailing) {
                                     Button(role: .destructive) { pendingDelete = m } label: { Label("Delete", systemImage: "trash") }
                                     Button {
