@@ -59,8 +59,38 @@ def images(directory, start, count):
         print(f"::notice title=IMG {start + i:02d} {escape(label)[:120]}::{data}")
 
 
+def crashes():
+    """Prints the crashed thread of recent LifeLog crash reports (simulator writes them to the host)."""
+    import glob
+    reports = sorted(glob.glob(os.path.expanduser("~/Library/Logs/DiagnosticReports/LifeLog*.ips")), key=os.path.getmtime)
+    print(f"{len(reports)} crash reports")
+    for path in reports[-2:]:
+        text = open(path, errors="replace").read()
+        header, _, body = text.partition("\n")
+        try:
+            report = json.loads(body)
+        except ValueError:
+            print(text[:3000])
+            continue
+        lines = [f"exception: {json.dumps(report.get('exception'))}",
+                 f"termination: {json.dumps(report.get('termination'))}",
+                 f"asi: {json.dumps(report.get('asi'))}"]
+        images = report.get("usedImages", [])
+        for t in report.get("threads", []):
+            if not t.get("triggered"):
+                continue
+            for f in t.get("frames", [])[:30]:
+                image = images[f.get("imageIndex", 0)].get("name", "?") if images else "?"
+                lines.append(f"  {image} {f.get('symbol', '?')} +{f.get('symbolLocation', 0)} {f.get('sourceFile', '')}:{f.get('sourceLine', '')}")
+        msg = "\n".join(lines)
+        print(msg)
+        print(f"::error title=Crash {escape(os.path.basename(path))}::{escape(msg)[:60000]}")
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "failures":
+    if sys.argv[1] == "crashes":
+        crashes()
+    elif sys.argv[1] == "failures":
         failures(sys.argv[2])
     else:
         images(sys.argv[2], int(sys.argv[3]), int(sys.argv[4]))

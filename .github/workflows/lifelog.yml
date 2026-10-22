@@ -118,6 +118,10 @@ jobs:
         if: always()
         working-directory: LifeLog
         run: python3 scripts/ci_report.py failures build/UITests.xcresult || true
+      - name: Crash reports
+        if: always()
+        working-directory: LifeLog
+        run: python3 scripts/ci_report.py crashes || true
       - name: Screenshots 1
         if: always()
         working-directory: LifeLog
