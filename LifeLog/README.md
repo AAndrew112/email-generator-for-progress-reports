@@ -187,7 +187,14 @@ LifeLog/
 Development:
 
 - `cd LifeLogKit && swift test` runs the core tests on macOS or Linux.
-- CI builds every target for the simulator and for device. See `.github/workflows/lifelog.yml`.
+- CI (`.github/workflows/lifelog.yml`) does four things:
+  - runs the core tests;
+  - builds every target for the simulator and for a device;
+  - runs the iPhone UI tests: one-tap log and undo, a preset, the two-tap scrolling
+    episode, the full morning check-in, creating a measure, and export;
+  - runs the Watch UI tests.
+- In Xcode, ⌘U on the LifeLog or LifeLogWatch scheme runs the same UI tests against a
+  fresh throwaway database (the `-uiTesting` launch argument).
 - After adding or removing files, run `brew install xcodegen && xcodegen generate`.
 
 How sync works: each change is saved locally first and marked pending. It's then sent
