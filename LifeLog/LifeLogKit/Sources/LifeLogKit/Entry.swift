@@ -122,6 +122,14 @@ public struct Entry: Codable, Hashable, Sendable, Identifiable {
         utcOffsetSeconds = self.timeZone.secondsFromGMT(for: date)
     }
 
+    /// True when the user-editable content matches (bookkeeping fields ignored).
+    public func hasSameContent(as other: Entry) -> Bool {
+        measureID == other.measureID && occurredAt == other.occurredAt && timeZoneID == other.timeZoneID
+            && values == other.values && note == other.note && deletedAt == other.deletedAt
+            && sessionID == other.sessionID && presetID == other.presetID && metadata == other.metadata
+            && context == other.context
+    }
+
     /// True when the event time differs meaningfully from when it was first recorded.
     public var isBackdated: Bool { abs(createdAt.timeIntervalSince(occurredAt)) > 10 * 60 }
 

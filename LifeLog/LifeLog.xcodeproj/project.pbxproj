@@ -9,16 +9,24 @@
 /* Begin PBXBuildFile section */
 		04CA71286FF1C3DE885D0A2F /* WatchRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EABE85E3100D8F8347871098 /* WatchRootView.swift */; };
 		0AEC6DB41093325617712707 /* QuickLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F14E7A206E839A64074E7F7 /* QuickLogger.swift */; };
+		1499E1E4E489D1ADE372A8F9 /* CheckInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05121A7A7692B162274F5E16 /* CheckInView.swift */; };
+		1726B170AB56AE8AC02A1A09 /* FieldEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC5E4E090C0686A03860EA98 /* FieldEditorView.swift */; };
 		21E690D051FBACA698140D0D /* StoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 963F074CAEE285EDA2203C70 /* StoreFactory.swift */; };
 		29FBF74FEE9362C418F5CB48 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 333BE5BEB653985A890EDB07 /* AppModel.swift */; };
+		2D264E71FE05D2800E33CC3D /* EntryFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B18D5EDBFF4154390A12B4 /* EntryFormView.swift */; };
+		3112585637039A4CFEA618FE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2766B8C01A4082D763D86B6E /* SettingsView.swift */; };
 		3514F4FB813E7191ABD7E92D /* LifeLogWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FF62945F7C28EA705D08B0EB /* LifeLogWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		35AB62BD8E3A4249C0CA3425 /* LifeLogKit in Frameworks */ = {isa = PBXBuildFile; productRef = ACB9DE1D7EDF9D7C3C0ECF73 /* LifeLogKit */; };
 		3ADA033161B9375FC6188BEB /* LifeLogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D56275D4D00144A880189C /* LifeLogApp.swift */; };
+		49925F6C6D83952147DD765B /* FieldInputs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FE5A11C549B57B254EC18C /* FieldInputs.swift */; };
 		4DBF444E52E9A6213F757E86 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87262915A806678511584EF7 /* Theme.swift */; };
 		52FC22AFF8D5D31AC7ABE71F /* LifeLogWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A37F3CFAA5E9A9750F2AD86D /* LifeLogWidgets.swift */; };
 		55B1D45368429160F129F7A9 /* QuickLogIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABEDBDA4910C61366CF59782 /* QuickLogIntent.swift */; };
+		59123C513E639D76DA832764 /* Services.swift in Sources */ = {isa = PBXBuildFile; fileRef = 621DE4ECEB174DC58E33D0DE /* Services.swift */; };
 		5F437DB572B951F223E8B9B4 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87262915A806678511584EF7 /* Theme.swift */; };
 		65164E99CB4899F01C8E3C83 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87262915A806678511584EF7 /* Theme.swift */; };
+		69987628CE466B85FE6B1618 /* MeasuresView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C077C90F3763BCFA98BA6940 /* MeasuresView.swift */; };
+		75BFBCE49D0021AA0D960689 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F1F9B0376564C5E91885670 /* TodayView.swift */; };
 		77E7123B03AEC4E2404985DE /* StoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 963F074CAEE285EDA2203C70 /* StoreFactory.swift */; };
 		797EECBB544BC05538F15F66 /* AppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D9F19C2FE0F89DCC26787C /* AppIntents.swift */; };
 		7B37C6F8EF01CFEFE5A81E0E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3223A447E4E7B3E15584B08 /* RootView.swift */; };
@@ -27,15 +35,19 @@
 		89232463BA9088F982AADD16 /* LifeLogComplications.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD8E80BE4365F068CB61E3AD /* LifeLogComplications.swift */; };
 		97AFAF50CEC29EB5B1489483 /* StoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 963F074CAEE285EDA2203C70 /* StoreFactory.swift */; };
 		9D1ED654C838C5EB6BE8311C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87262915A806678511584EF7 /* Theme.swift */; };
+		A427E3F0C97460048BD03944 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531783F265197CE0068EECF8 /* HistoryView.swift */; };
 		B1806FAF08D125692E68D255 /* QuickLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F14E7A206E839A64074E7F7 /* QuickLogger.swift */; };
 		B2C2B3E1D2C879205E5CCC92 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 333BE5BEB653985A890EDB07 /* AppModel.swift */; };
 		C50A0868A2E0036E3E35A6ED /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C3E93F956739FF0061527F4B /* Assets.xcassets */; };
 		C9674058671E9422F322F45D /* LifeLogWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = C6BB6130ECFE45FE013C2800 /* LifeLogWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CF67116D657013CF99003F47 /* WatchSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD6E519D0D9A97EAD8911B5A /* WatchSync.swift */; };
+		DCDF8D65A0FDAD571AB90CCB /* WatchEntryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE121265A60887FCBFCABDF3 /* WatchEntryViews.swift */; };
 		E3D88248492D114D798CD9B2 /* WatchSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD6E519D0D9A97EAD8911B5A /* WatchSync.swift */; };
+		E50238FC5BD5A1F81479BEF2 /* MeasureEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA52BA069BDD9C2ED9D4F199 /* MeasureEditorView.swift */; };
 		EA66E1A598CFD56E69E8807C /* LifeLogWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73054F27D74A4543DB405BC /* LifeLogWatchApp.swift */; };
 		EC20A9515A855BBAB01BF656 /* QuickLogIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABEDBDA4910C61366CF59782 /* QuickLogIntent.swift */; };
 		EF9793D796977639779AD0A0 /* QuickLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F14E7A206E839A64074E7F7 /* QuickLogger.swift */; };
+		EFDC0DF9D5A6B6ECC5B6DE93 /* WatchCheckInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C50A122DC513B795B713FF /* WatchCheckInView.swift */; };
 		F33F140604CFC48BEBCCBC65 /* LifeLogWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8F6DABBE7A17F001DA785A88 /* LifeLogWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		FCBE7191C31AF470EF22E3A0 /* LifeLogKit in Frameworks */ = {isa = PBXBuildFile; productRef = E77FDCCAF629EE5B050A28D2 /* LifeLogKit */; };
 /* End PBXBuildFile section */
@@ -101,30 +113,42 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		05121A7A7692B162274F5E16 /* CheckInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckInView.swift; sourceTree = "<group>"; };
+		0F1F9B0376564C5E91885670 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		2766B8C01A4082D763D86B6E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2F14E7A206E839A64074E7F7 /* QuickLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLogger.swift; sourceTree = "<group>"; };
 		30D5433F24AC43D335BF75C2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		31D56275D4D00144A880189C /* LifeLogApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifeLogApp.swift; sourceTree = "<group>"; };
 		333BE5BEB653985A890EDB07 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		4F870EF8838AB106B0214A1C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		531783F265197CE0068EECF8 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		58D9F19C2FE0F89DCC26787C /* AppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIntents.swift; sourceTree = "<group>"; };
+		621DE4ECEB174DC58E33D0DE /* Services.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services.swift; sourceTree = "<group>"; };
 		658D1B7E896D02D6A886BA36 /* LifeLog.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LifeLog.entitlements; sourceTree = "<group>"; };
 		67CB194959FE9F70352549FF /* LifeLogKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LifeLogKit; path = LifeLogKit; sourceTree = SOURCE_ROOT; };
+		83FE5A11C549B57B254EC18C /* FieldInputs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldInputs.swift; sourceTree = "<group>"; };
 		87262915A806678511584EF7 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8F6DABBE7A17F001DA785A88 /* LifeLogWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = LifeLogWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		918E7B4497FF36ECD9FDD0BB /* Project.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Project.xcconfig; sourceTree = "<group>"; };
 		963F074CAEE285EDA2203C70 /* StoreFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreFactory.swift; sourceTree = "<group>"; };
 		A37F3CFAA5E9A9750F2AD86D /* LifeLogWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifeLogWidgets.swift; sourceTree = "<group>"; };
 		A636DBD5A0822D4667BEBEE0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		AA52BA069BDD9C2ED9D4F199 /* MeasureEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasureEditorView.swift; sourceTree = "<group>"; };
 		ABEDBDA4910C61366CF59782 /* QuickLogIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLogIntent.swift; sourceTree = "<group>"; };
 		B4B8299006F8D67881EC2275 /* LifeLog.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LifeLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4C50A122DC513B795B713FF /* WatchCheckInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCheckInView.swift; sourceTree = "<group>"; };
+		B9B18D5EDBFF4154390A12B4 /* EntryFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryFormView.swift; sourceTree = "<group>"; };
+		C077C90F3763BCFA98BA6940 /* MeasuresView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasuresView.swift; sourceTree = "<group>"; };
 		C3E93F956739FF0061527F4B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C6BB6130ECFE45FE013C2800 /* LifeLogWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifeLogWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C73054F27D74A4543DB405BC /* LifeLogWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifeLogWatchApp.swift; sourceTree = "<group>"; };
 		CD8E80BE4365F068CB61E3AD /* LifeLogComplications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifeLogComplications.swift; sourceTree = "<group>"; };
+		CE121265A60887FCBFCABDF3 /* WatchEntryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchEntryViews.swift; sourceTree = "<group>"; };
 		D7155D8E6E0A27ECC82B04E1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E9C31E7AFA794D26F8206BF3 /* LifeLogWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LifeLogWidgets.entitlements; sourceTree = "<group>"; };
 		EABE85E3100D8F8347871098 /* WatchRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRootView.swift; sourceTree = "<group>"; };
 		F3223A447E4E7B3E15584B08 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		FC5E4E090C0686A03860EA98 /* FieldEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldEditorView.swift; sourceTree = "<group>"; };
 		FD6E519D0D9A97EAD8911B5A /* WatchSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSync.swift; sourceTree = "<group>"; };
 		FD95C7DB8FDD7F48A7A8C645 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FF62945F7C28EA705D08B0EB /* LifeLogWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LifeLogWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -163,10 +187,20 @@
 			children = (
 				58D9F19C2FE0F89DCC26787C /* AppIntents.swift */,
 				30D5433F24AC43D335BF75C2 /* Assets.xcassets */,
+				05121A7A7692B162274F5E16 /* CheckInView.swift */,
+				B9B18D5EDBFF4154390A12B4 /* EntryFormView.swift */,
+				FC5E4E090C0686A03860EA98 /* FieldEditorView.swift */,
+				83FE5A11C549B57B254EC18C /* FieldInputs.swift */,
+				531783F265197CE0068EECF8 /* HistoryView.swift */,
 				FD95C7DB8FDD7F48A7A8C645 /* Info.plist */,
 				658D1B7E896D02D6A886BA36 /* LifeLog.entitlements */,
 				31D56275D4D00144A880189C /* LifeLogApp.swift */,
+				AA52BA069BDD9C2ED9D4F199 /* MeasureEditorView.swift */,
+				C077C90F3763BCFA98BA6940 /* MeasuresView.swift */,
 				F3223A447E4E7B3E15584B08 /* RootView.swift */,
+				621DE4ECEB174DC58E33D0DE /* Services.swift */,
+				2766B8C01A4082D763D86B6E /* SettingsView.swift */,
+				0F1F9B0376564C5E91885670 /* TodayView.swift */,
 			);
 			path = iOS;
 			sourceTree = "<group>";
@@ -177,6 +211,8 @@
 				C3E93F956739FF0061527F4B /* Assets.xcassets */,
 				4F870EF8838AB106B0214A1C /* Info.plist */,
 				C73054F27D74A4543DB405BC /* LifeLogWatchApp.swift */,
+				B4C50A122DC513B795B713FF /* WatchCheckInView.swift */,
+				CE121265A60887FCBFCABDF3 /* WatchEntryViews.swift */,
 				EABE85E3100D8F8347871098 /* WatchRootView.swift */,
 			);
 			path = Watch;
@@ -445,6 +481,8 @@
 				EF9793D796977639779AD0A0 /* QuickLogger.swift in Sources */,
 				97AFAF50CEC29EB5B1489483 /* StoreFactory.swift in Sources */,
 				65164E99CB4899F01C8E3C83 /* Theme.swift in Sources */,
+				EFDC0DF9D5A6B6ECC5B6DE93 /* WatchCheckInView.swift in Sources */,
+				DCDF8D65A0FDAD571AB90CCB /* WatchEntryViews.swift in Sources */,
 				04CA71286FF1C3DE885D0A2F /* WatchRootView.swift in Sources */,
 				E3D88248492D114D798CD9B2 /* WatchSync.swift in Sources */,
 			);
@@ -477,12 +515,22 @@
 			files = (
 				797EECBB544BC05538F15F66 /* AppIntents.swift in Sources */,
 				B2C2B3E1D2C879205E5CCC92 /* AppModel.swift in Sources */,
+				1499E1E4E489D1ADE372A8F9 /* CheckInView.swift in Sources */,
+				2D264E71FE05D2800E33CC3D /* EntryFormView.swift in Sources */,
+				1726B170AB56AE8AC02A1A09 /* FieldEditorView.swift in Sources */,
+				49925F6C6D83952147DD765B /* FieldInputs.swift in Sources */,
+				A427E3F0C97460048BD03944 /* HistoryView.swift in Sources */,
 				3ADA033161B9375FC6188BEB /* LifeLogApp.swift in Sources */,
+				E50238FC5BD5A1F81479BEF2 /* MeasureEditorView.swift in Sources */,
+				69987628CE466B85FE6B1618 /* MeasuresView.swift in Sources */,
 				EC20A9515A855BBAB01BF656 /* QuickLogIntent.swift in Sources */,
 				B1806FAF08D125692E68D255 /* QuickLogger.swift in Sources */,
 				7B37C6F8EF01CFEFE5A81E0E /* RootView.swift in Sources */,
+				59123C513E639D76DA832764 /* Services.swift in Sources */,
+				3112585637039A4CFEA618FE /* SettingsView.swift in Sources */,
 				77E7123B03AEC4E2404985DE /* StoreFactory.swift in Sources */,
 				5F437DB572B951F223E8B9B4 /* Theme.swift in Sources */,
+				75BFBCE49D0021AA0D960689 /* TodayView.swift in Sources */,
 				CF67116D657013CF99003F47 /* WatchSync.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

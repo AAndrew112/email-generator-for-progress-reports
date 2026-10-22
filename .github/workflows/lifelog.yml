@@ -17,7 +17,7 @@ jobs:
     name: LifeLogKit tests
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Select newest Xcode
         run: |
           XC=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
@@ -31,7 +31,7 @@ jobs:
     name: Build iPhone + Watch apps
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Select newest Xcode
         run: |
           XC=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
@@ -43,9 +43,12 @@ jobs:
         run: |
           brew install xcodegen >/dev/null 2>&1 || true
           if command -v xcodegen >/dev/null; then
-            cp -R LifeLog.xcodeproj /tmp/committed.xcodeproj
+            files() { grep -oE '/\* [^*]+\.(swift|plist|entitlements|xcassets|xcconfig) \*/' "$1" | sort -u; }
+            files LifeLog.xcodeproj/project.pbxproj > /tmp/committed.txt
             xcodegen generate --quiet
-            diff -r /tmp/committed.xcodeproj/project.pbxproj LifeLog.xcodeproj/project.pbxproj && echo "Project up to date" || echo "::warning::LifeLog.xcodeproj differs from project.yml output"
+            files LifeLog.xcodeproj/project.pbxproj > /tmp/generated.txt
+            if diff /tmp/committed.txt /tmp/generated.txt; then echo "Project file list up to date"; else echo "::error::Run 'xcodegen generate' in LifeLog/ and commit LifeLog.xcodeproj"; exit 1; fi
+            git checkout -- LifeLog.xcodeproj
           fi
       - name: Build iOS app (embeds Watch app and widgets)
         working-directory: LifeLog

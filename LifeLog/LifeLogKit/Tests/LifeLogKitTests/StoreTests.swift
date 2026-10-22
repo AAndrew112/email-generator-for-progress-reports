@@ -52,6 +52,8 @@ final class StoreTests: XCTestCase {
         XCTAssertNil(e.values["trigger"], "empty selections are not stored")
         XCTAssertEqual(store.entry(id: e.id)?.values["outcome"], .choices(["resisted"]))
 
+        XCTAssertEqual(try store.saveEntry(e).revision, 1, "saving unchanged content is not an edit")
+
         clock.advance(60)
         e.values["strength"] = .number(3)
         e.setOccurredAt(clock.date.addingTimeInterval(-3600))

@@ -374,6 +374,7 @@ public final class Store: @unchecked Sendable {
         e.values = e.values.filter { !$0.value.isEmpty }
         if let n = e.note, n.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { e.note = nil }
         let existing = try _entry(e.id)
+        if kind == nil, let existing, existing.hasSameContent(as: e) { return existing }
         e.revision = (existing?.revision ?? 0) + 1
         if let existing {
             e.createdAt = existing.createdAt
