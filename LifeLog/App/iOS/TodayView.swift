@@ -11,54 +11,64 @@ struct TodayView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
                     header
                     HStack(spacing: 12) {
                         CheckInCard(kind: .morning)
                         CheckInCard(kind: .evening)
                     }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                }
-                .listRowSeparator(.hidden)
 
-                Section {
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(model.favorites) { action in
-                            QuickTile(action: action, count: model.count(action)) { tap(action) }
-                                .contextMenu {
-                                    Button { formAction = action } label: { Label("Log with details…", systemImage: "square.and.pencil") }
-                                    Button { router.sheet = .pickMeasure } label: { Label("Log at an earlier time…", systemImage: "clock.arrow.circlepath") }
-                                }
-                        }
-                        MoreTile { router.sheet = .pickMeasure }
-                    }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                } header: {
-                    Text("Quick log")
-                } footer: {
-                    if model.favorites.isEmpty {
-                        Text("Star measures or presets in the Measures tab to pin them here.")
-                    }
-                }
-
-                Section("Today") {
-                    if model.todayEntries.isEmpty {
-                        Text("Nothing logged yet today.").foregroundStyle(.secondary)
-                    }
-                    ForEach(model.todayEntries.reversed()) { entry in
-                        EntryRow(entry: entry, measure: model.measure(entry.measureID))
-                            .contentShape(Rectangle())
-                            .onTapGesture { router.sheet = .editEntry(entry.id) }
-                            .swipeActions {
-                                Button(role: .destructive) { model.delete(entry.id) } label: { Label("Delete", systemImage: "trash") }
+                    VStack(alignment: .leading, spacing: 10) {
+                        SectionTitle("Quick log")
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            ForEach(model.favorites) { action in
+                                QuickTile(action: action, count: model.count(action)) { tap(action) }
+                                    .contextMenu {
+                                        Button { formAction = action } label: { Label("Log with details…", systemImage: "square.and.pencil") }
+                                        Button { router.sheet = .pickMeasure } label: { Label("Log at an earlier time…", systemImage: "clock.arrow.circlepath") }
+                                    }
                             }
+                            MoreTile { router.sheet = .pickMeasure }
+                        }
+                        if model.favorites.isEmpty {
+                            Text("Star measures or presets in the Measures tab to pin them here.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        SectionTitle("Today")
+                        VStack(spacing: 0) {
+                            if model.todayEntries.isEmpty {
+                                Text("Nothing logged yet today.")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+                            }
+                            ForEach(Array(model.todayEntries.reversed().enumerated()), id: \.element.id) { i, entry in
+                                if i > 0 { Divider().padding(.leading, 56) }
+                                Button { router.sheet = .editEntry(entry.id) } label: {
+                                    EntryRow(entry: entry, measure: model.measure(entry.measureID))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button { router.sheet = .editEntry(entry.id) } label: { Label("Edit", systemImage: "pencil") }
+                                    Button(role: .destructive) { model.delete(entry.id) } label: { Label("Delete", systemImage: "trash") }
+                                }
+                            }
+                        }
+                        .background(Color(uiColor: .secondarySystemGroupedBackground),
+                                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                 }
+                .padding(.horizontal)
+                .padding(.bottom, 90)
             }
-            .listStyle(.insetGrouped)
+            .background(Color(uiColor: .systemGroupedBackground))
             .sensoryFeedback(.impact(weight: .medium), trigger: tapCount)
             .navigationTitle("Today")
             .toolbar {
@@ -92,8 +102,6 @@ struct TodayView: View {
                 .background(.tint.opacity(0.12), in: Capsule())
             }
         }
-        .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 8, trailing: 4))
-        .listRowBackground(Color.clear)
     }
 
     private func tap(_ action: QuickAction) {
@@ -104,6 +112,14 @@ struct TodayView: View {
         case .needsInput(let a, let existing):
             if let existing { router.sheet = .editEntry(existing.id) } else { router.sheet = .newEntry(actionID: a.id) }
         }
+    }
+}
+
+struct SectionTitle: View {
+    let title: String
+    init(_ title: String) { self.title = title }
+    var body: some View {
+        Text(title).font(.title3.weight(.semibold))
     }
 }
 
