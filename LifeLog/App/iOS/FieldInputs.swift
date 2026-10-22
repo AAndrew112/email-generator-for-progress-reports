@@ -79,6 +79,8 @@ struct FieldInput: View {
     @Binding var value: FieldValue?
     var style: Style = .form
     var suggestions: [String] = []
+    /// Starting point when a time field is first set (otherwise now).
+    var suggestedDate: Date? = nil
     /// Called after a discrete one-tap answer (rating, choice, yes/no, duration chip).
     var onAnswered: (() -> Void)? = nil
 
@@ -88,7 +90,7 @@ struct FieldInput: View {
         case .number: NumberInput(field: field, tint: tint, value: $value)
         case .boolean: BooleanInput(tint: tint, value: $value, onAnswered: onAnswered)
         case .choice, .multiChoice: ChoiceInput(field: field, tint: tint, value: $value, onAnswered: onAnswered)
-        case .time: TimeInput(value: $value)
+        case .time: TimeInput(value: $value, suggested: suggestedDate)
         case .duration: DurationInput(field: field, tint: tint, value: $value, onAnswered: onAnswered)
         case .text: TextInput(field: field, tint: tint, value: $value, suggestions: suggestions)
         case .photo: PhotoInput(value: $value)
@@ -297,6 +299,7 @@ struct ChoiceInput: View {
 
 struct TimeInput: View {
     @Binding var value: FieldValue?
+    var suggested: Date? = nil
 
     var body: some View {
         if let date = value?.date {
@@ -309,7 +312,7 @@ struct TimeInput: View {
             }
         } else {
             Button {
-                value = .date(Date())
+                value = .date(suggested ?? Date())
             } label: {
                 Label("Set time", systemImage: "clock")
             }

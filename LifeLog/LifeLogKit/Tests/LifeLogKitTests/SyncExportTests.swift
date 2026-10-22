@@ -286,3 +286,57 @@ final class ExportTests: XCTestCase {
         XCTAssertEqual(CSVTable.escape("line\nbreak"), "\"line\nbreak\"")
     }
 }
+
+/// Writes a realistic 42-day export when LIFELOG_SAMPLE_EXPORT is set, for manual
+/// inspection (e.g. loading it in pandas or R). Skipped otherwise.
+final class SampleExportTests: XCTestCase {
+    func testWriteSampleExport() throws {
+        guard let path = ProcessInfo.processInfo.environment["LIFELOG_SAMPLE_EXPORT"] else {
+            throw XCTSkip("Set LIFELOG_SAMPLE_EXPORT to write a sample export")
+        }
+        let clock = Clock("2026-10-19T11:00:00Z")
+        let store = try makeStore(clock: clock)
+        let ms = Dictionary(uniqueKeysWithValues: store.measures().map { ($0.key, $0) })
+        var rng = SystemRandomNumberGenerator()
+        func log(_ key: String, _ values: [String: FieldValue], _ date: Date, _ context: EntryContext = .quickLog) throws {
+            var e = store.makeEntry(for: ms[key]!, values: values, context: context, source: Bool.random(using: &rng) ? .watch : .iPhone)
+            e.timeZoneID = newYork.identifier
+            e.setOccurredAt(date)
+            try store.saveEntry(e)
+        }
+        let start = ISO8601DateFormatter().date(from: "2026-10-19T11:00:00Z")!
+        for day in 0..<42 {
+            let morning = start.addingTimeInterval(Double(day) * 86_400)
+            if day % 9 == 4 { continue } // a few days with no data at all
+            clock.date = morning
+            try store.saveSession(CheckInSession(kind: .morning, dayKey: "", startedAt: morning, completedAt: morning.addingTimeInterval(45),
+                                                 timeZone: newYork, presentedMeasureKeys: ["sleep_times", "sleep_quality", "restedness"],
+                                                 answeredMeasureKeys: ["sleep_times", "sleep_quality", "restedness"]))
+            let onset = morning.addingTimeInterval(-Double(Int.random(in: 7...9, using: &rng)) * 3600)
+            try log("sleep_times", ["bedtime": .date(onset.addingTimeInterval(-1200)), "sleep_onset": .date(onset),
+                                    "wake_time": .date(morning), "sleep_duration": .duration(morning.timeIntervalSince(onset))],
+                    morning, .morningCheckIn)
+            try log("sleep_quality", ["rating": .number(Double(Int.random(in: 0...4, using: &rng)))], morning, .morningCheckIn)
+            if day % 5 != 0 { try log("restedness", ["rating": .number(Double(Int.random(in: 0...4, using: &rng)))], morning, .morningCheckIn) }
+            for _ in 0..<Int.random(in: 0...6, using: &rng) {
+                try log("screen_urge", ["outcome": .choices([Bool.random(using: &rng) ? "resisted" : "gave_in"])],
+                        morning.addingTimeInterval(Double(Int.random(in: 1...14, using: &rng)) * 3600))
+            }
+            for _ in 0..<Int.random(in: 0...3, using: &rng) {
+                try log("scroll_episode", ["duration": .duration(Double(Int.random(in: 1...12, using: &rng) * 5 * 60)),
+                                           "trigger": .choices(["bored"]), "platform": .choices(["instagram"])],
+                        morning.addingTimeInterval(Double(Int.random(in: 1...16, using: &rng)) * 3600))
+            }
+            try log("caffeine", ["source": .choices(["coffee"]), "dose": .number(95)], morning.addingTimeInterval(1800))
+            let evening = morning.addingTimeInterval(14 * 3600)
+            for key in ["mood", "anxiety", "brain_fog", "mental_energy", "focus", "work_avoidance", "work_progress", "fulfillment"]
+            where day % 7 != 3 {
+                try log(key, ["rating": .number(Double(Int.random(in: 0...4, using: &rng)))], evening, .eveningCheckIn)
+            }
+        }
+        let out = URL(fileURLWithPath: path)
+        try? FileManager.default.removeItem(at: out)
+        let result = try Exporter(store: store, photoDirectory: nil).export(to: out, options: ExportOptions(appVersion: "sample"))
+        print("Sample export: \(result.entryCount) entries, \(result.dayCount) days → \(out.path)")
+    }
+}

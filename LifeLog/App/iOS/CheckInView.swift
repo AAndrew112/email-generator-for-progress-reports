@@ -103,7 +103,7 @@ struct CheckInView: View {
                     ForEach(fields) { f in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(f.displayPrompt).font(.subheadline.weight(.semibold))
-                            FieldInput(field: f, tint: tint, value: binding(m, f))
+                            FieldInput(field: f, tint: tint, value: binding(m, f), suggestedDate: suggestedTime(f))
                         }
                         .padding(14)
                         .background(Color(uiColor: .secondarySystemGroupedBackground),
@@ -222,6 +222,19 @@ struct CheckInView: View {
             }
             drafts[m.id] = e
         })
+    }
+
+    /// Sensible starting points for sleep times so setting them takes a nudge, not a scroll.
+    private func suggestedTime(_ f: FieldDefinition) -> Date? {
+        switch f.key {
+        case "bedtime": return SleepMath.lastNight(hour: 23, minute: 0, reference: Date())
+        case "sleep_onset": return SleepMath.lastNight(hour: 23, minute: 20, reference: Date())
+        case "wake_time":
+            let now = Date()
+            let minute = Calendar.current.component(.minute, from: now)
+            return Calendar.current.date(byAdding: .minute, value: -(minute % 5), to: now)
+        default: return nil
+        }
     }
 
     private func requiredSatisfied(_ m: Measure) -> Bool {
