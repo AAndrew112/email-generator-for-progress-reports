@@ -25,12 +25,13 @@ final class LifeLogWatchUITests: XCTestCase {
 
     @discardableResult
     private func scrollTo(_ element: XCUIElement) -> Bool {
+        // Swipes fling past rows on the Watch; turn the Digital Crown in small steps instead.
         var n = 0
-        while !element.exists && n < 8 {
-            app.swipeUp()
+        while !(element.exists && element.isHittable) && n < 24 {
+            XCUIDevice.shared.rotateDigitalCrown(delta: 0.2)
             n += 1
         }
-        let found = element.waitForExistence(timeout: 2)
+        let found = element.waitForExistence(timeout: 2) && element.isHittable
         if !found {
             let tree = XCTAttachment(string: app.debugDescription)
             tree.name = "hierarchy-\(name)"
