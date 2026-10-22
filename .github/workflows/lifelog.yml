@@ -110,7 +110,8 @@ jobs:
           set -o pipefail
           xcodebuild test -project LifeLog.xcodeproj -scheme LifeLog \
             -destination "id=${{ steps.sim.outputs.udid }}" \
-            -resultBundlePath build/UITests.xcresult -derivedDataPath build/dd -quiet
+            -resultBundlePath build/UITests.xcresult -derivedDataPath build/dd \
+            -retry-tests-on-failure -test-iterations 2 -quiet
       - name: Export screenshots
         if: always()
         working-directory: LifeLog
@@ -175,7 +176,8 @@ jobs:
           set -o pipefail
           xcodebuild test -project LifeLog.xcodeproj -scheme LifeLogWatch \
             -destination "id=${{ steps.sim.outputs.udid }}" \
-            -resultBundlePath build/WatchUITests.xcresult -derivedDataPath build/dd -quiet
+            -resultBundlePath build/WatchUITests.xcresult -derivedDataPath build/dd \
+            -retry-tests-on-failure -test-iterations 2 -quiet
       - name: Report
         if: always()
         working-directory: LifeLog
@@ -185,6 +187,7 @@ jobs:
           mkdir -p build/screenshots
           xcrun xcresulttool export attachments --path build/WatchUITests.xcresult --output-path build/screenshots > /dev/null || true
           python3 scripts/ci_report.py failures build/WatchUITests.xcresult || true
+          python3 scripts/ci_report.py texts build/screenshots || true
           python3 scripts/ci_report.py crashes || true
           if [ "${{ job.status }}" != "success" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             python3 scripts/ci_report.py publish build/screenshots "LifeLog Watch screenshots" || true

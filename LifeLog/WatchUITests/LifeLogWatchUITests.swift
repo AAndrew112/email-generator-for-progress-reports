@@ -30,7 +30,14 @@ final class LifeLogWatchUITests: XCTestCase {
             app.swipeUp()
             n += 1
         }
-        return element.waitForExistence(timeout: 2)
+        let found = element.waitForExistence(timeout: 2)
+        if !found {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "hierarchy-\(name)"
+            tree.lifetime = .keepAlways
+            add(tree)
+        }
+        return found
     }
 
     func testOneTapFavorite() {

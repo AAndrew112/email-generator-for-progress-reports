@@ -42,6 +42,19 @@ def failures(bundle):
         print(f"FAIL {test}: {message}")
 
 
+def texts(directory, prefix="hierarchy"):
+    """Prints text attachments whose name starts with `prefix` (e.g. accessibility trees)."""
+    try:
+        manifest = json.load(open(os.path.join(directory, "manifest.json")))
+    except OSError:
+        return
+    for test in manifest:
+        for att in test.get("attachments", []):
+            if att.get("suggestedHumanReadableName", "").startswith(prefix):
+                print(f"===== {test.get('testIdentifier')} {att.get('suggestedHumanReadableName')}")
+                print(open(os.path.join(directory, att["exportedFileName"]), errors="replace").read()[:12000])
+
+
 def images(directory, start, count):
     manifest = json.load(open(os.path.join(directory, "manifest.json")))
     shots = []
@@ -131,7 +144,9 @@ def publish(directory, prefix="LifeLog UI screenshots"):
 
 
 if __name__ == "__main__":
-    if sys.argv[1] == "publish":
+    if sys.argv[1] == "texts":
+        texts(sys.argv[2])
+    elif sys.argv[1] == "publish":
         publish(sys.argv[2], *sys.argv[3:4])
     elif sys.argv[1] == "crashes":
         crashes()
