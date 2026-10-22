@@ -1,0 +1,70 @@
+name: LifeLog
+
+on:
+  push:
+    branches: [claude/lifelog-wellbeing-tracker-62yabv, main]
+    paths: ["LifeLog/**", ".github/workflows/lifelog.yml"]
+  pull_request:
+    paths: ["LifeLog/**", ".github/workflows/lifelog.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: lifelog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-tests:
+    name: LifeLogKit tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+      - name: swift test
+        working-directory: LifeLog/LifeLogKit
+        run: swift test
+
+  build:
+    name: Build iPhone + Watch apps
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -E "iphone|watch"
+      - name: Verify the committed Xcode project matches project.yml
+        working-directory: LifeLog
+        run: |
+          brew install xcodegen >/dev/null 2>&1 || true
+          if command -v xcodegen >/dev/null; then
+            cp -R LifeLog.xcodeproj /tmp/committed.xcodeproj
+            xcodegen generate --quiet
+            diff -r /tmp/committed.xcodeproj/project.pbxproj LifeLog.xcodeproj/project.pbxproj && echo "Project up to date" || echo "::warning::LifeLog.xcodeproj differs from project.yml output"
+          fi
+      - name: Build iOS app (embeds Watch app and widgets)
+        working-directory: LifeLog
+        run: |
+          set -o pipefail
+          xcodebuild -project LifeLog.xcodeproj -scheme LifeLog -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/dd CODE_SIGNING_ALLOWED=NO -quiet build
+      - name: Build Watch app on its own
+        working-directory: LifeLog
+        run: |
+          set -o pipefail
+          xcodebuild -project LifeLog.xcodeproj -scheme LifeLogWatch -configuration Debug \
+            -destination 'generic/platform=watchOS Simulator' \
+            -derivedDataPath build/dd CODE_SIGNING_ALLOWED=NO -quiet build
+      - name: Build for device (unsigned, Release)
+        working-directory: LifeLog
+        run: |
+          set -o pipefail
+          xcodebuild -project LifeLog.xcodeproj -scheme LifeLog -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dd-device CODE_SIGNING_ALLOWED=NO -quiet build

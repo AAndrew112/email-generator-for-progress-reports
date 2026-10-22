@@ -1,0 +1,19 @@
+// LifeLog build configuration.
+//
+// To install on your own iPhone and Apple Watch, set these two values
+// (or put them in Config/Signing.local.xcconfig, which git ignores):
+//
+//   LIFELOG_TEAM_ID           Your 10-character Apple Developer Team ID
+//                             (developer.apple.com → Account → Membership details).
+//   LIFELOG_BUNDLE_ID_PREFIX  A reverse-DNS prefix you own, e.g. com.yourname.
+//                             Bundle IDs and the App Group are derived from it.
+
+LIFELOG_TEAM_ID =
+LIFELOG_BUNDLE_ID_PREFIX = com.example
+
+#include? "Signing.local.xcconfig"
+
+DEVELOPMENT_TEAM = $(LIFELOG_TEAM_ID)
+CODE_SIGN_STYLE = Automatic
+LIFELOG_APP_BUNDLE_ID = $(LIFELOG_BUNDLE_ID_PREFIX).lifelog
+LIFELOG_APP_GROUP = group.$(LIFELOG_BUNDLE_ID_PREFIX).lifelog

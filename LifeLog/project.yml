@@ -1,0 +1,151 @@
+# XcodeGen spec. LifeLog.xcodeproj is generated from this file and committed,
+# so XcodeGen is only needed if you change the project structure:
+#   brew install xcodegen && xcodegen generate
+name: LifeLog
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+    watchOS: "10.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+  groupSortPosition: top
+configFiles:
+  Debug: Config/Project.xcconfig
+  Release: Config/Project.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+packages:
+  LifeLogKit:
+    path: LifeLogKit
+
+targets:
+  LifeLog:
+    type: application
+    platform: iOS
+    sources:
+      - App/iOS
+      - App/Shared
+      - App/Intents
+    dependencies:
+      - package: LifeLogKit
+      - target: LifeLogWidgets
+      - target: LifeLogWatch
+    entitlements:
+      path: App/iOS/LifeLog.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(LIFELOG_APP_GROUP)
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
+    info:
+      path: App/iOS/Info.plist
+      properties:
+        CFBundleDisplayName: LifeLog
+        LSApplicationCategoryType: public.app-category.healthcare-fitness
+        LifeLogAppGroup: $(LIFELOG_APP_GROUP)
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSHealthShareUsageDescription: LifeLog can read last night’s sleep from Apple Health to pre-fill your morning check-in. Nothing is written to Health or sent anywhere.
+        NSCameraUsageDescription: LifeLog uses the camera only when you choose to attach a photo to an entry. Photos stay on this device.
+        NSPhotoLibraryUsageDescription: LifeLog lets you pick a photo to attach to an entry. Photos stay on this device.
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: lifelog
+            CFBundleURLSchemes: [lifelog]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LIFELOG_APP_BUNDLE_ID)
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_CFBundleDisplayName: LifeLog
+    scheme: {}
+
+  LifeLogWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets/iOS
+      - App/Intents
+      - path: App/Shared/Theme.swift
+      - path: App/Shared/StoreFactory.swift
+      - path: App/Shared/QuickLogger.swift
+    dependencies:
+      - package: LifeLogKit
+    entitlements:
+      path: Widgets/iOS/LifeLogWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(LIFELOG_APP_GROUP)
+    info:
+      path: Widgets/iOS/Info.plist
+      properties:
+        CFBundleDisplayName: LifeLog
+        LifeLogAppGroup: $(LIFELOG_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LIFELOG_APP_BUNDLE_ID).widgets
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) WIDGET_EXTENSION
+
+  LifeLogWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - App/Watch
+      - App/Shared
+    dependencies:
+      - package: LifeLogKit
+      - target: LifeLogWatchWidgets
+    info:
+      path: App/Watch/Info.plist
+      properties:
+        CFBundleDisplayName: LifeLog
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: $(LIFELOG_APP_BUNDLE_ID)
+        WKRunsIndependentlyOfCompanionApp: true
+        CFBundleURLTypes:
+          - CFBundleURLName: lifelog
+            CFBundleURLSchemes: [lifelog]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LIFELOG_APP_BUNDLE_ID).watchkitapp
+        TARGETED_DEVICE_FAMILY: "4"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SKIP_INSTALL: YES
+    scheme: {}
+
+  LifeLogWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - Widgets/Watch
+      - path: App/Shared/Theme.swift
+    info:
+      path: Widgets/Watch/Info.plist
+      properties:
+        CFBundleDisplayName: LifeLog
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LIFELOG_APP_BUNDLE_ID).watchkitapp.complications
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES
