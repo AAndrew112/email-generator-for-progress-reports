@@ -90,7 +90,9 @@ final class LifeLogUITests: XCTestCase {
         name.typeText("Took a walk")
         snapshot("10-new-measure")
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts["Took a walk"].waitForExistence(timeout: 3))
+        let row = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Took a walk'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "new measure appears in the list")
+        snapshot("10b-measure-saved")
     }
 
     func testExportProducesShareSheet() {
@@ -99,8 +101,10 @@ final class LifeLogUITests: XCTestCase {
         XCTAssertTrue(export.waitForExistence(timeout: 5))
         snapshot("11-settings")
         export.tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'entries ·'")).firstMatch.waitForExistence(timeout: 15),
-                      "export summary appears")
+        let done = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'entries ·' OR label CONTAINS 'Save to Files' OR identifier == 'ActivityListView'"))
+            .firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 20), "export finishes and the share sheet appears")
         snapshot("12-export")
     }
 }

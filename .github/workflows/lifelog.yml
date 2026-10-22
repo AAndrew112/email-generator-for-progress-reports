@@ -75,6 +75,9 @@ jobs:
   ui-tests:
     name: UI tests (iPhone simulator)
     runs-on: macos-15
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v5
       - name: Select newest Xcode
@@ -122,14 +125,12 @@ jobs:
         if: always()
         working-directory: LifeLog
         run: python3 scripts/ci_report.py crashes || true
-      - name: Screenshots 1
+      - name: Publish screenshots
         if: always()
         working-directory: LifeLog
-        run: python3 scripts/ci_report.py images build/screenshots 0 9 || true
-      - name: Screenshots 2
-        if: always()
-        working-directory: LifeLog
-        run: python3 scripts/ci_report.py images build/screenshots 9 9 || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/ci_report.py publish build/screenshots || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

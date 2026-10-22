@@ -87,8 +87,53 @@ def crashes():
         print(f"::error title=Crash {escape(os.path.basename(path))}::{escape(msg)[:60000]}")
 
 
+def publish(directory):
+    """Attaches screenshots to the commit as neutral check runs (base64 JPEG in the output text),
+    so they can be reviewed without downloading artifacts."""
+    import urllib.request
+    token, repo, sha = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY"), os.environ.get("GITHUB_SHA")
+    if not (token and repo and sha):
+        print("missing GitHub environment")
+        return
+    manifest = json.load(open(os.path.join(directory, "manifest.json")))
+    shots = []
+    for test in manifest:
+        for att in test.get("attachments", []):
+            name = att.get("exportedFileName", "")
+            if name.lower().endswith(".png"):
+                label = att.get("suggestedHumanReadableName", name).split("_0_")[0]
+                shots.append((f"{test.get('testIdentifier', '')}/{label}", os.path.join(directory, name)))
+    groups, current, size = [], [], 0
+    for label, path in sorted(shots):
+        subprocess.run(["sips", "-Z", "560", "-s", "format", "jpeg", "-s", "formatOptions", "55", path,
+                        "--out", "/tmp/shot.jpg"], capture_output=True)
+        block = f"### {label}\n{base64.b64encode(open('/tmp/shot.jpg', 'rb').read()).decode()}\n"
+        if current and size + len(block) > 60000:
+            groups.append(current)
+            current, size = [], 0
+        current.append(block)
+        size += len(block)
+    if current:
+        groups.append(current)
+    for i, blocks in enumerate(groups):
+        body = json.dumps({
+            "name": f"LifeLog UI screenshots {i + 1}/{len(groups)}", "head_sha": sha, "status": "completed",
+            "conclusion": "neutral",
+            "output": {"title": "UI test screenshots", "summary": "Base64 JPEG screenshots from the UI tests.",
+                       "text": "".join(blocks)}}).encode()
+        req = urllib.request.Request(f"https://api.github.com/repos/{repo}/check-runs", data=body, method="POST",
+                                     headers={"Authorization": f"Bearer {token}",
+                                              "Accept": "application/vnd.github+json"})
+        try:
+            print(urllib.request.urlopen(req).status, len(blocks), "screenshots")
+        except Exception as e:  # never fail the build over screenshots
+            print("publish failed:", e)
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "crashes":
+    if sys.argv[1] == "publish":
+        publish(sys.argv[2])
+    elif sys.argv[1] == "crashes":
         crashes()
     elif sys.argv[1] == "failures":
         failures(sys.argv[2])
