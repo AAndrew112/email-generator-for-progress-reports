@@ -20,6 +20,10 @@ contamination_window_hours = 36
 assume_timezone = ""
 # Transcribe videos with uncertain ownership before you review them.
 transcribe_uncertain = false
+# PERMANENTLY delete original videos once finished: other people's once
+# excluded, yours once the transcript is approved. Cannot be undone.
+# Skip it for one run with: pha mp process --keep-files
+delete_after_processing = false
 
 # Add rules ONLY after `pha mp inspect` shows the field and you have checked it
 # against videos whose sender/date you know.

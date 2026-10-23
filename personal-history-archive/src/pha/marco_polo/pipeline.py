@@ -113,6 +113,7 @@ class MarcoPoloPipeline:
         reclassify: bool = False,
         force_retranscribe: bool = False,
         limit: int | None = None,
+        allow_delete: bool = True,
     ) -> Progress:
         require_ffmpeg()
         if not self.mp.input_dir or not self.root.exists():
@@ -153,6 +154,8 @@ class MarcoPoloPipeline:
 
         self._flag_near_duplicates()
         log.info(progress.summary())
+        if self.mp.delete_after_processing and allow_delete:
+            self.delete_finished()
         return progress
 
     def _process(
@@ -419,6 +422,53 @@ class MarcoPoloPipeline:
             )
         wav.unlink(missing_ok=True)  # derived cache only; original untouched
         return f"transcribed ({len(result.text.split())} words)"
+
+    # ------------------------------------------------------------- deletion
+    def _deletable(self, src: Any) -> str | None:
+        """Why a source's files may be deleted, or None to keep them."""
+        if src["status"] == "excluded" and src["ownership"] == "other":
+            return "not my video"
+        if src["status"] == "done" and src["ownership"] == "owner":
+            recs = self.db.records_for_source(src["source_id"])
+            if recs and all(
+                r["approved_at"]
+                and r["raw_transcript"] is not None
+                and r["transcription_status"] in ("machine", "corrected", "no_audio")
+                for r in recs
+            ):
+                return "transcript approved"
+        return None
+
+    def delete_finished(self) -> int:
+        """Permanently delete original files that are finished with.
+
+        Only files inside the input folder whose content still matches the
+        processed file are deleted, and every deletion is recorded.
+        """
+        root = self.root.resolve()
+        deleted = 0
+        for src in self.db.sources(SOURCE_TYPE):
+            reason = self._deletable(src)
+            if reason is None:
+                continue
+            for location in self.db.source_locations(src["source_id"]):
+                path = Path(location)
+                if not path.is_file():
+                    continue
+                try:
+                    path.resolve().relative_to(root)
+                except ValueError:
+                    log.warning("Not deleting %s: outside the Marco Polo folder", path)
+                    continue
+                if self.db.cached_sha256(path) != src["sha256"]:
+                    log.warning("Not deleting %s: content differs from the processed video", path)
+                    continue
+                path.unlink()
+                self.db.record_deletion(src["source_id"], location, src["sha256"], reason)
+                deleted += 1
+                log.debug("Deleted %s (%s)", path, reason)
+        log.info("Deleted %d finished original video file(s)", deleted)
+        return deleted
 
     def _flag_near_duplicates(self) -> None:
         """Different files with the same duration and recording time: likely re-encodes."""

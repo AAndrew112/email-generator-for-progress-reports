@@ -17,7 +17,7 @@ re-export.
 
 | Rule | How |
 |---|---|
-| Originals are never modified or deleted | Videos and PDFs are only opened for reading; audio, page images and Drive downloads go to `archive_data/cache/`. A test checks file hashes and mtimes before and after a run. |
+| Originals are never modified, and never deleted unless you turn that on | Videos and PDFs are only opened for reading; audio, page images and Drive downloads go to `archive_data/cache/`. A test checks file hashes and mtimes before and after a run. The one exception is the opt-in `delete_after_processing` setting for videos (below). |
 | No guessing about who recorded a video | Ownership comes from sender metadata you confirm, or from voice verification against recordings you label. Anything else goes to the review queue. Filenames and folders are recorded as context only and never decide ownership. |
 | Not "the loudest speaker" | Every ~1.6 s window of speech is compared with your voice profile. A video where both you and someone clearly different speak is flagged `multiple speakers detected`. |
 | No invented dates | Videos are dated only from metadata fields you confirmed after inspection. Journal entries are dated from what is written on the page. Records without a verified date stay in the **undated** section. |
@@ -133,6 +133,22 @@ journals, set `vision.backend = "manual"` and type pages in the review UI.
 
 If you confirm a timestamp rule after videos are already transcribed,
 the next `pha mp process` dates them without re-transcribing.
+
+### Deleting videos when finished (optional, permanent)
+
+Set `delete_after_processing = true` under `[marco_polo]` and each
+`pha mp process` run ends by **permanently deleting** original videos it
+has finished with:
+
+- other people's videos, once excluded from the archive;
+- your videos, once their transcript is saved **and approved**.
+
+Videos that are uncertain, failed, or not yet approved are never deleted,
+and neither is any file outside `input_dir` or whose content no longer
+matches the video that was processed. Every deletion is recorded in the
+database and in `archive.json` (`deleted_originals`); the transcript and
+all its details stay in the archive, but the review page can no longer play
+the video. Skip deletion for a single run with `pha mp process --keep-files`.
 
 ## Step 2: Journals
 

@@ -105,6 +105,15 @@ CREATE TABLE IF NOT EXISTS corrections (
     at          TEXT NOT NULL
 );
 
+-- Original files deleted on request (marco_polo.delete_after_processing).
+CREATE TABLE IF NOT EXISTS deleted_files (
+    location    TEXT PRIMARY KEY,
+    source_id   TEXT NOT NULL,
+    sha256      TEXT,
+    reason      TEXT NOT NULL,
+    deleted_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS failures (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id   TEXT,
@@ -253,6 +262,19 @@ class Database:
             sql += " AND status = ?"
             args.append(status)
         return self.conn.execute(sql + " ORDER BY first_seen, source_id", args).fetchall()
+
+    def record_deletion(self, source_id: str, location: str, sha256: str | None, reason: str) -> None:
+        with self.tx() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO deleted_files (location, source_id, sha256, reason, deleted_at)"
+                " VALUES (?,?,?,?,?)",
+                (location, source_id, sha256, reason, now_iso()),
+            )
+
+    def deleted_files(self, source_id: str) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM deleted_files WHERE source_id = ? ORDER BY deleted_at", (source_id,)
+        ).fetchall()
 
     def log_failure(self, source_id: str | None, stage: str, error: str) -> None:
         with self.tx() as c:

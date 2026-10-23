@@ -78,6 +78,7 @@ def cmd_mp_process(args: argparse.Namespace) -> None:
             reclassify=args.reclassify,
             force_retranscribe=args.force_retranscribe,
             limit=args.limit,
+            allow_delete=not args.keep_files,
         )
 
 
@@ -167,6 +168,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--retry-failed", action="store_true")
     s.add_argument("--reclassify", action="store_true", help="redo automatic ownership decisions")
     s.add_argument("--force-retranscribe", action="store_true")
+    s.add_argument(
+        "--keep-files", action="store_true",
+        help="skip delete_after_processing for this run",
+    )
     s.add_argument("--limit", type=int)
     s.set_defaults(func=cmd_mp_process)
 

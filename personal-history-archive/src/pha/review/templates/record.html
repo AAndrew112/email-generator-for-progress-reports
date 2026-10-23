@@ -10,7 +10,11 @@
 <div>
   <div class="card">
   {% if r.source_type == 'marco_polo' %}
+    {% if deleted and deleted|length >= locations|length %}
+    <p class="muted">Original video deleted {{ deleted[-1].deleted_at[:10] }} ({{ deleted[-1].reason }}); the transcript is kept.</p>
+    {% else %}
     <video controls preload="metadata" src="{{ url_for('media_source', source_id=r.source_id) }}"></video>
+    {% endif %}
     <p class="muted">Duration {{ '%.1f'|format(r.duration or 0) }} s · {{ r.speaker_verification }}</p>
   {% else %}
     {% for p in detail.get('pages', []) %}

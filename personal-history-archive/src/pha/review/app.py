@@ -111,6 +111,7 @@ def create_app(cfg: Config, db: Database | None = None) -> Flask:
         return render_template(
             "record.html", r=r, e=effective(r), items=items, corrections=corrections,
             detail=detail, evidence=evidence, locations=d.source_locations(r["source_id"]),
+            deleted=d.deleted_files(r["source_id"]),
         )
 
     @app.post("/record/<record_id>/correct")

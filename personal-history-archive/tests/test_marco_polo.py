@@ -296,3 +296,67 @@ def test_inspect_lists_filename_senders(cfg, db, named_export):
     assert fm["timezone_abbreviations"] == {"PST": 2}
     assert "filename:timestamp" in report["date_fields"]
     assert "**Amanda W**" in render_markdown(report)
+
+
+# ------------------------------------------------------- delete_after_processing
+@pytest.fixture
+def deletable_export(cfg, tmp_path):
+    root = tmp_path / "exports" / "chat"
+    make_video(root / "2025-01-02_18-30-00_PST_amanda_a.mp4", mtime=OLD)
+    make_video(root / "2025-01-03_09-00-00_PST_Evelyn_E.mp4", seconds=5, freqs=(OTHER_HZ,), mtime=OLD)
+    make_video(root / "mystery.mp4", seconds=3, mtime=OLD)  # no sender in name -> uncertain
+    shutil.copy2(root / "2025-01-03_09-00-00_PST_Evelyn_E.mp4", root / "copy.mp4")
+    cfg.marco_polo.ownership_rules = [
+        OwnershipMetadataRule("filename", "sender", ["amanda a"], spot_checked=True)
+    ]
+    cfg.marco_polo.timestamp_rules = [TimestampSourceRule("filename", "timestamp")]
+    return root
+
+
+def test_nothing_deleted_unless_enabled(cfg, db, deletable_export):
+    before = sorted(p.name for p in deletable_export.iterdir())
+    run(cfg, db)
+    for rec in db.all_records():
+        db.approve_record(rec["record_id"])
+    run(cfg, db)
+    assert sorted(p.name for p in deletable_export.iterdir()) == before
+
+
+def test_deletes_only_finished_videos(cfg, db, deletable_export):
+    cfg.marco_polo.delete_after_processing = True
+    mine = deletable_export / "2025-01-02_18-30-00_PST_amanda_a.mp4"
+    run(cfg, db)
+    left = sorted(p.name for p in deletable_export.iterdir())
+    # Other person's video and its duplicate copy are gone; mine waits for approval;
+    # the uncertain one is never deleted.
+    assert left == ["2025-01-02_18-30-00_PST_amanda_a.mp4", "mystery.mp4"]
+
+    rec = [r for r in db.all_records() if r["source_filename"] == mine.name][0]
+    db.approve_record(rec["record_id"])
+    run(cfg, db, allow_delete=False)
+    assert mine.exists()  # --keep-files
+    run(cfg, db)
+    assert not mine.exists()
+    assert sorted(p.name for p in deletable_export.iterdir()) == ["mystery.mp4"]
+
+    # The record and transcript remain, and the deletion is on file.
+    out = export_archive(db, cfg.export_path)
+    assert out["records"] == 1
+    data = json.loads((cfg.export_path / "archive.json").read_text())
+    deleted = data["records"][0]["metadata"]["deleted_originals"]
+    assert deleted[0]["reason"] == "transcript approved"
+    assert data["records"][0]["transcript"].startswith("Um, so I-")
+
+
+def test_never_deletes_outside_folder_or_changed_files(cfg, db, deletable_export, tmp_path):
+    cfg.marco_polo.delete_after_processing = True
+    other = deletable_export / "2025-01-03_09-00-00_PST_Evelyn_E.mp4"
+    outside = tmp_path / "elsewhere.mp4"
+    shutil.copy2(other, outside)
+    run(cfg, db, allow_delete=False)
+    sid = by_name(db)[other.name]["source_id"]
+    db.upsert_source(sid, "marco_polo", outside.name, str(outside), None, None)
+    other.write_bytes(b"something else now")  # same path, different content
+    MarcoPoloPipeline(cfg, db, transcriber_factory=FakeTranscriber).delete_finished()
+    assert outside.exists() and other.exists()
+    assert not (deletable_export / "copy.mp4").exists()

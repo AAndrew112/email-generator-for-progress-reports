@@ -104,6 +104,10 @@ def build_records(db: Database) -> list[dict[str, Any]]:
                 },
                 "transcript_detail": _loads(row["transcript_detail"]),
                 "all_source_locations": db.source_locations(row["source_id"]),
+                "deleted_originals": [
+                    {"location": d["location"], "deleted_at": d["deleted_at"], "reason": d["reason"]}
+                    for d in db.deleted_files(row["source_id"])
+                ],
                 "approved_at": row["approved_at"],
                 "open_review_items": reviews,
                 "created_at": row["created_at"],

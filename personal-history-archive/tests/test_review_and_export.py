@@ -184,3 +184,13 @@ def test_progress_summary_groups_outcomes():
     assert p.summary() == (
         "marco_polo: 4/4 processed (excluded (not my video)=1, failed at transcription=1, transcribed=2)"
     )
+
+
+def test_record_page_notes_deleted_original(cfg, populated):
+    db = populated
+    rec = db.all_records()[0]
+    for loc in db.source_locations(rec["source_id"]):
+        db.record_deletion(rec["source_id"], loc, None, "transcript approved")
+    client, _ = _client(cfg, db)
+    html = client.get(f"/record/{rec['record_id']}").get_data(as_text=True)
+    assert "Original video deleted" in html and "<video" not in html

@@ -73,6 +73,10 @@ class MarcoPoloConfig:
     assume_timezone: str = ""
     # Whether to transcribe videos whose ownership is uncertain before review.
     transcribe_uncertain: bool = False
+    # PERMANENTLY delete original video files once they are finished with:
+    # other people's once excluded, yours once the transcript is approved.
+    # Uncertain, failed or unapproved videos are never deleted. Off by default.
+    delete_after_processing: bool = False
 
 
 @dataclass
