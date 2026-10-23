@@ -63,6 +63,14 @@ class CloudNotAuthorized(RuntimeError):
     pass
 
 
+class BackendUnavailable(RuntimeError):
+    """The recognition service cannot be reached; stop the run instead of failing pages."""
+
+
+def _media_type(path: Path) -> str:
+    return "image/jpeg" if path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+
+
 class OllamaBackend:
     name = "ollama"
 
@@ -84,17 +92,22 @@ class OllamaBackend:
 
     def transcribe(self, image_path: Path) -> PageTranscription:
         b64 = base64.b64encode(image_path.read_bytes()).decode()
-        resp = requests.post(
-            f"{self.url}/api/generate",
-            json={
-                "model": self.model,
-                "prompt": PROMPT,
-                "images": [b64],
-                "stream": False,
-                "options": self.options,
-            },
-            timeout=self.timeout,
-        )
+        try:
+            resp = requests.post(
+                f"{self.url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": PROMPT,
+                    "images": [b64],
+                    "stream": False,
+                    "options": self.options,
+                },
+                timeout=self.timeout,
+            )
+        except requests.ConnectionError as exc:
+            raise BackendUnavailable(
+                f"Cannot reach Ollama at {self.url}. Is the Ollama app running? (open -a Ollama)"
+            ) from exc
         resp.raise_for_status()
         body = resp.json()
         return PageTranscription(
@@ -139,7 +152,7 @@ class AnthropicBackend:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}},
+                        {"type": "image", "source": {"type": "base64", "media_type": _media_type(image_path), "data": data}},
                         {"type": "text", "text": PROMPT},
                     ],
                 }

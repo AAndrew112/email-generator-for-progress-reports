@@ -195,7 +195,8 @@ def create_app(cfg: Config, db: Database | None = None) -> Flask:
         ).fetchone()
         if row is None or not row["image_path"] or not Path(row["image_path"]).is_file():
             abort(404)
-        return send_file(row["image_path"], mimetype="image/png", conditional=True)
+        mimetype = "image/jpeg" if row["image_path"].lower().endswith((".jpg", ".jpeg")) else "image/png"
+        return send_file(row["image_path"], mimetype=mimetype, conditional=True)
 
     # ------------------------------------------------------------- export
     @app.post("/export")

@@ -304,3 +304,57 @@ def test_each_page_is_reported_as_it_finishes(cfg, db, tmp_path, caplog):
         JournalPipeline(cfg, db, backend_factory=lambda: _vision(sid)).run(source="local")
     assert "journal 1998 part 1.pdf page 1/3: transcribed (" in caplog.text
     assert "page 3/3" in caplog.text
+
+
+def test_pages_cached_as_jpeg(cfg, db, tmp_path):
+    pdf = _setup(cfg, tmp_path)
+    sid = "jr-" + sha256_file(pdf)[:16]
+    JournalPipeline(cfg, db, backend_factory=lambda: _vision(sid)).run(source="local")
+    paths = [r["image_path"] for r in db.conn.execute("SELECT image_path FROM journal_pages")]
+    assert paths and all(p.endswith(".jpg") for p in paths)
+    with open(paths[0], "rb") as fh:
+        assert fh.read(3) == b"\xff\xd8\xff"  # JPEG signature
+
+
+@pytest.mark.parametrize("problem", ["ollama_down", "disk_full"])
+def test_run_stops_instead_of_failing_every_page(cfg, db, tmp_path, problem):
+    import errno
+
+    from pha.journals.pipeline import RunAborted
+    from pha.journals.vision import BackendUnavailable
+
+    pdf = _setup(cfg, tmp_path)
+    sid = "jr-" + sha256_file(pdf)[:16]
+    script = _vision(sid).script
+
+    class Breaks(FakeVision):
+        def transcribe(self, image_path):
+            if image_path.stem == "p0002":
+                if problem == "ollama_down":
+                    raise BackendUnavailable("Cannot reach Ollama")
+                raise OSError(errno.ENOSPC, "No space left on device")
+            return super().transcribe(image_path)
+
+    with pytest.raises(RunAborted):
+        JournalPipeline(cfg, db, backend_factory=lambda: Breaks(script)).run(source="local")
+    statuses = dict(db.conn.execute("SELECT page_number, status FROM journal_pages").fetchall())
+    assert statuses[1] == "done" and statuses.get(2) != "failed"
+    assert db.get_source(sid)["status"] == "pending"
+
+    v = _vision(sid)
+    JournalPipeline(cfg, db, backend_factory=lambda: v).run(source="local")
+    assert [p.stem for p in v.calls] == ["p0002", "p0003"]
+    assert db.get_source(sid)["status"] == "done"
+
+
+def test_ollama_connection_error_becomes_backend_unavailable(cfg, tmp_path, monkeypatch):
+    import pha.journals.vision as vision
+
+    def refuse(*a, **kw):
+        raise vision.requests.ConnectionError("refused")
+
+    monkeypatch.setattr(vision.requests, "post", refuse)
+    img = tmp_path / "p.jpg"
+    img.write_bytes(b"x")
+    with pytest.raises(vision.BackendUnavailable, match="Is the Ollama app running"):
+        OllamaBackend(cfg).transcribe(img)

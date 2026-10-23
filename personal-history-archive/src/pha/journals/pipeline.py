@@ -8,6 +8,7 @@ Scans are never modified or deleted; duplicates are flagged for review.
 from __future__ import annotations
 
 import difflib
+import errno
 import json
 import logging
 import time
@@ -21,7 +22,7 @@ from ..runtime import Progress
 from . import drive as gdrive
 from .entries import date_entry, split_entries, year_hints
 from .render import dhash, hamming, ink_ratio, page_count, render_page
-from .vision import VisionBackend, make_backend, uncertainty_markers
+from .vision import BackendUnavailable, VisionBackend, make_backend, uncertainty_markers
 
 log = logging.getLogger("pha.journals")
 
@@ -29,6 +30,10 @@ SOURCE_TYPE = "journal"
 MAX_ATTEMPTS = 3
 BLANK_INK = 0.004
 TRUNCATED_NOTE = "model output hit its length limit; the end of the page may be missing"
+
+
+class RunAborted(RuntimeError):
+    """A problem that would fail every remaining page (disk full, Ollama down)."""
 
 
 @dataclass
@@ -147,6 +152,11 @@ class JournalPipeline:
         for js in sources:
             try:
                 outcome = self._process(js, retry_failed, force)
+            except RunAborted as exc:
+                progress.step(js.filename, "stopped")
+                log.error("Run stopped: %s", exc)
+                log.error("Fix that, then run the same command again; finished pages are kept.")
+                raise
             except Exception as exc:
                 log.exception("Failed on %s", js.filename)
                 self.db.log_failure(js.source_id, "journal", str(exc))
@@ -191,12 +201,24 @@ class JournalPipeline:
         for p in range(1, n_pages + 1):
             started = time.monotonic()
             try:
-                outcome = self._page(js, p, force)
+                try:
+                    outcome = self._page(js, p, force)
+                except BackendUnavailable as exc:
+                    raise RunAborted(str(exc)) from exc
+                except OSError as exc:
+                    if exc.errno == errno.ENOSPC:
+                        raise RunAborted(
+                            "The disk is full. Free some space (see README), then run again."
+                        ) from exc
+                    raise
                 if outcome != "already done":
                     log.info(
                         "  %s page %d/%d: %s (%.0fs)",
                         js.filename, p, n_pages, outcome, time.monotonic() - started,
                     )
+            except RunAborted:
+                self.db.update_source(js.source_id, status="pending", attempts=0)
+                raise
             except Exception as exc:
                 failed += 1
                 log.exception("Page %d of %s failed", p, js.filename)
@@ -227,13 +249,13 @@ class JournalPipeline:
         ).fetchone()
         if row and row["status"] == "done" and not force:
             return "already done"
-        png = render_page(js.local_pdf, page, self.page_cache / js.source_id / f"p{page:04d}.png", self.jc.render_dpi)
-        ink = ink_ratio(png)
-        self._set_page(js.source_id, page, image_path=str(png), phash=dhash(png), ink_ratio=ink)
+        img = render_page(js.local_pdf, page, self.page_cache / js.source_id / f"p{page:04d}.jpg", self.jc.render_dpi)
+        ink = ink_ratio(img)
+        self._set_page(js.source_id, page, image_path=str(img), phash=dhash(img), ink_ratio=ink)
         if ink < BLANK_INK:
             self._set_page(js.source_id, page, raw_text="[blank page]", backend="ink-check", model="", status="done", error=None)
             return "blank page"
-        result = self.backend.transcribe(png)
+        result = self.backend.transcribe(img)
         if result is None:
             self._set_page(js.source_id, page, status="manual_needed", backend=self.backend.name, error=None)
             return "needs manual transcription"

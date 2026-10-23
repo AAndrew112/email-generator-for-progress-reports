@@ -119,12 +119,17 @@ def cmd_journals_list(args: argparse.Namespace) -> None:
 def cmd_journals_process(args: argparse.Namespace) -> None:
     from .journals.pipeline import JournalPipeline
 
+    from .journals.pipeline import RunAborted
+
     cfg = _load(args)
     with run_lock(cfg.data_path):
         db = Database(cfg.db_path)
-        JournalPipeline(cfg, db).run(
-            source=args.source, retry_failed=args.retry_failed, force=args.force, limit=args.limit
-        )
+        try:
+            JournalPipeline(cfg, db).run(
+                source=args.source, retry_failed=args.retry_failed, force=args.force, limit=args.limit
+            )
+        except RunAborted:
+            sys.exit(1)
 
 
 def cmd_journals_evaluate(args: argparse.Namespace) -> None:
