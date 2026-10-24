@@ -13,6 +13,7 @@ explicit markers instead of guesses.
 from __future__ import annotations
 
 import base64
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +22,8 @@ from typing import Protocol
 import requests
 
 from ..config import Config
+
+log = logging.getLogger("pha.vision")
 
 ENTRY_MARKER = "=== ENTRY ==="
 
@@ -90,25 +93,41 @@ class OllamaBackend:
                 "needs cloud_ai_authorized = true."
             )
 
+    # Longest side in pixels for each attempt; None sends the page as rendered.
+    # Ollama answers an oversized image (too many image tokens) with HTTP 500.
+    ATTEMPT_SIZES = (None, 2000, 1400)
+
     def transcribe(self, image_path: Path) -> PageTranscription:
-        b64 = base64.b64encode(image_path.read_bytes()).decode()
-        try:
-            resp = requests.post(
-                f"{self.url}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": PROMPT,
-                    "images": [b64],
-                    "stream": False,
-                    "options": self.options,
-                },
-                timeout=self.timeout,
+        for max_side in self.ATTEMPT_SIZES:
+            data = image_path.read_bytes() if max_side is None else _downscaled(image_path, max_side)
+            try:
+                resp = requests.post(
+                    f"{self.url}/api/generate",
+                    json={
+                        "model": self.model,
+                        "prompt": PROMPT,
+                        "images": [base64.b64encode(data).decode()],
+                        "stream": False,
+                        "options": self.options,
+                    },
+                    timeout=self.timeout,
+                )
+            except requests.ConnectionError as exc:
+                raise BackendUnavailable(
+                    f"Cannot reach Ollama at {self.url}. Is the Ollama app running? (open -a Ollama)"
+                ) from exc
+            if resp.status_code < 500:
+                break
+            log.warning(
+                "Ollama error on %s at %s; retrying smaller: %s",
+                image_path.name, f"max {max_side}px" if max_side else "full size", resp.text[:200],
             )
-        except requests.ConnectionError as exc:
-            raise BackendUnavailable(
-                f"Cannot reach Ollama at {self.url}. Is the Ollama app running? (open -a Ollama)"
-            ) from exc
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            raise requests.HTTPError(
+                f"Ollama returned {resp.status_code} for {image_path.name} even at reduced size: "
+                f"{resp.text[:300]}",
+                response=resp,
+            )
         body = resp.json()
         return PageTranscription(
             strip_wrapping(body.get("response", "")),
@@ -116,6 +135,20 @@ class OllamaBackend:
             self.model,
             truncated=body.get("done_reason") == "length",
         )
+
+
+def _downscaled(image_path: Path, max_side: int) -> bytes:
+    """The page image shrunk so its longest side is at most ``max_side`` (JPEG)."""
+    import io
+
+    from PIL import Image
+
+    with Image.open(image_path) as im:
+        im = im.convert("RGB")
+        im.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=90)
+    return buf.getvalue()
 
 
 class ManualBackend:

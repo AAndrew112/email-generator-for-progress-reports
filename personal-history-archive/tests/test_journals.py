@@ -261,8 +261,7 @@ def test_ollama_sends_large_context_and_detects_cutoff(cfg, tmp_path, monkeypatc
     sent = {}
 
     class Resp:
-        def raise_for_status(self):
-            pass
+        status_code = 200
 
         def json(self):
             return {"response": "```\nDear Diary, today we\n```", "done_reason": "length"}
@@ -357,4 +356,54 @@ def test_ollama_connection_error_becomes_backend_unavailable(cfg, tmp_path, monk
     img = tmp_path / "p.jpg"
     img.write_bytes(b"x")
     with pytest.raises(vision.BackendUnavailable, match="Is the Ollama app running"):
+        OllamaBackend(cfg).transcribe(img)
+
+
+def _jpeg(path, size):
+    from PIL import Image
+
+    Image.new("RGB", size, "white").save(path, format="JPEG")
+    return path
+
+
+def test_ollama_server_error_retries_with_smaller_image(cfg, tmp_path, monkeypatch):
+    import base64 as b64
+    import io
+
+    from PIL import Image
+
+    import pha.journals.vision as vision
+
+    sizes = []
+
+    class Resp:
+        def __init__(self, code):
+            self.status_code = code
+            self.text = "model ran out of memory" if code >= 500 else ""
+
+        def json(self):
+            return {"response": "Dear Diary", "done_reason": "stop"}
+
+    def fake_post(url, json, timeout):
+        with Image.open(io.BytesIO(b64.b64decode(json["images"][0]))) as im:
+            sizes.append(max(im.size))
+        return Resp(500 if len(sizes) == 1 else 200)
+
+    monkeypatch.setattr(vision.requests, "post", fake_post)
+    img = _jpeg(tmp_path / "p0001.jpg", (3000, 4000))
+    result = OllamaBackend(cfg).transcribe(img)
+    assert result.text == "Dear Diary"
+    assert sizes == [4000, 2000]
+
+
+def test_ollama_persistent_server_error_reports_reason(cfg, tmp_path, monkeypatch):
+    import pha.journals.vision as vision
+
+    class Resp:
+        status_code = 500
+        text = "model ran out of memory"
+
+    monkeypatch.setattr(vision.requests, "post", lambda *a, **kw: Resp())
+    img = _jpeg(tmp_path / "p0001.jpg", (3000, 4000))
+    with pytest.raises(vision.requests.HTTPError, match="out of memory"):
         OllamaBackend(cfg).transcribe(img)
