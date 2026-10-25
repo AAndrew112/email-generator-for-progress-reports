@@ -7,7 +7,13 @@ from conftest import FakeVision, make_pdf
 from pha.config import Config
 from pha.export import export_archive
 from pha.journals import drive as gdrive
-from pha.journals.entries import parse_written_date, parse_written_time, split_entries, year_hints
+from pha.journals.entries import (
+    date_from_filename,
+    parse_written_date,
+    parse_written_time,
+    split_entries,
+    year_hints,
+)
 from pha.journals.evaluate import evaluate, score_pair
 from pha.journals.pipeline import JournalPipeline
 from pha.journals.vision import AnthropicBackend, CloudNotAuthorized, ManualBackend, OllamaBackend
@@ -117,6 +123,56 @@ def test_journal_pipeline_records(cfg, db, tmp_path):
     vision2 = _vision(sid)
     JournalPipeline(cfg, db, backend_factory=lambda: vision2).run(source="local")
     assert vision2.calls == []
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("journal june 2019.pdf", "2019-06"),
+        ("journal november 15th 2014.pdf", "2014-11"),  # a day in the name is not the entry's day
+        ("journal 7.5.19.pdf", "2019-07"),
+        ("5.15.2021.pdf", "2021-05"),
+        ("2004.06 friend comments in yearbook.pdf", "2004-06"),
+        ("yearbook 10th june 2004.pdf", "2004-06"),
+        ("9th grade - may 2002.pdf", "2002-05"),
+        ("Journal 1998.pdf", "1998"),
+        ("journal june and july 2005.pdf", "2005"),
+        ("tarot march - may 2020.pdf", "2020"),
+        ("8th grade starting jan 16th 2002.pdf", "2002"),
+        ("NEW 8th grade, up until november 2001.pdf", "2001"),
+        ("8th grade dec 20 2001 - january, labelled pg 70 - 135.pdf", None),
+        ("10th grade poetry.pdf", None),
+        ("loose.pdf", None),
+    ],
+)
+def test_date_from_pdf_name(name, expected):
+    assert date_from_filename(name)[0] == expected
+
+
+def test_undated_entries_take_pdf_name_date_when_enabled(cfg, db, tmp_path):
+    pdf = _setup(cfg, tmp_path)
+    sid = "jr-" + sha256_file(pdf)[:16]
+    JournalPipeline(cfg, db, backend_factory=lambda: _vision(sid)).run(source="local")
+    undated = [r for r in db.all_records() if r["machine_date"] is None]
+    assert len(undated) == 1
+    rid = undated[0]["record_id"]
+    assert [i["reason"] for i in db.review_items("open", "date") if i["record_id"] == rid]
+
+    cfg.journals.date_undated_from_filename = True
+
+    class NoRecognition(FakeVision):
+        def transcribe(self, image_path):
+            raise AssertionError("redate must not transcribe")
+
+    result = JournalPipeline(cfg, db, backend_factory=lambda: NoRecognition({})).redate()
+    assert result["undated"] == 0 and result["from_name"] == 1
+    rec = db.get_record(rid)
+    assert (rec["machine_date"], rec["machine_time"], rec["machine_confidence"]) == ("1998", None, "inferred")
+    evidence = json.loads(rec["timestamp_evidence"])
+    assert evidence["filename_date"]["filename"] == "journal 1998 part 1.pdf"
+    assert not [i for i in db.review_items("open", "date") if i["record_id"] == rid]
+    # Entries with a written date are unchanged.
+    assert db.get_record(f"{sid}-p0001-00")["machine_date"] == "1998-03-04"
 
 
 def test_page_level_resume(cfg, db, tmp_path):

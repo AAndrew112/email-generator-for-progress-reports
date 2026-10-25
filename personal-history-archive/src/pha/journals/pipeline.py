@@ -284,7 +284,10 @@ class JournalPipeline:
             per_page_count[entry.start_page] = k + 1
             record_id = f"{source_id}-p{entry.start_page:04d}-{k:02d}"
             keep.add(record_id)
-            dated = date_entry(entry, self.jc.date_order, hints)
+            dated = date_entry(
+                entry, self.jc.date_order, hints,
+                src["filename"] if self.jc.date_undated_from_filename else None,
+            )
             backend_rows = [p for p in pages if entry.start_page <= p["page_number"] <= entry.end_page]
             markers = uncertainty_markers(entry.text)
             self.db.upsert_machine_record(
@@ -312,6 +315,7 @@ class JournalPipeline:
             )
             for reason in dated["review"]:
                 self.db.add_review("date", reason, record_id=record_id, details=dated["evidence"])
+            self.db.resolve_stale_reviews(record_id, "date", dated["review"], "no longer applies after re-dating")
             if markers:
                 self.db.add_review(
                     "transcription",
@@ -353,6 +357,22 @@ class JournalPipeline:
 
         self.db.delete_machine_records(source_id, keep)
         return len(keep)
+
+    def redate(self) -> dict[str, int]:
+        """Rebuild entries and dates from pages already transcribed (no recognition runs)."""
+        sources = self.db.conn.execute(
+            "SELECT DISTINCT p.source_id FROM journal_pages p JOIN sources s ON s.source_id = p.source_id"
+            " WHERE s.status != 'duplicate'"
+        ).fetchall()
+        entries = sum(self.build_records(row["source_id"]) for row in sources)
+        counts = self.db.conn.execute(
+            "SELECT SUM(COALESCE(corrected_date, machine_date) IS NOT NULL) AS dated,"
+            " SUM(COALESCE(corrected_date, machine_date) IS NULL) AS undated,"
+            " SUM(timestamp_evidence LIKE '%taken from the PDF name%' AND corrected_date IS NULL) AS from_name"
+            " FROM records WHERE source_type = ?",
+            (SOURCE_TYPE,),
+        ).fetchone()
+        return {"pdfs": len(sources), "entries": entries, **{k: counts[k] or 0 for k in counts.keys()}}
 
     # ---------------------------------------------------------- duplicates
     def flag_duplicate_pages(self) -> int:

@@ -132,6 +132,15 @@ def cmd_journals_process(args: argparse.Namespace) -> None:
             sys.exit(1)
 
 
+def cmd_journals_redate(args: argparse.Namespace) -> None:
+    from .journals.pipeline import JournalPipeline
+
+    cfg = _load(args)
+    with run_lock(cfg.data_path):
+        result = JournalPipeline(cfg, Database(cfg.db_path)).redate()
+    print(json.dumps(result, indent=2))
+
+
 def cmd_journals_evaluate(args: argparse.Namespace) -> None:
     from .journals.evaluate import evaluate
 
@@ -189,6 +198,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--force", action="store_true", help="re-transcribe pages already done")
     s.add_argument("--limit", type=int, help="only the first N PDFs (for sampling)")
     s.set_defaults(func=cmd_journals_process)
+    jr.add_parser(
+        "redate", help="re-split and re-date transcribed journal pages (no transcription)"
+    ).set_defaults(func=cmd_journals_redate)
     s = jr.add_parser("evaluate", help="score transcriptions against hand-checked pages")
     s.add_argument("--truth", required=True, help="folder of <pdf stem>__p<page>.txt files")
     s.set_defaults(func=cmd_journals_evaluate)

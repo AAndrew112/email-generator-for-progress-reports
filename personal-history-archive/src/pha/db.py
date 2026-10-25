@@ -441,6 +441,21 @@ class Database:
                 ),
             )
 
+    def resolve_stale_reviews(self, record_id: str, kind: str, current: list[str], resolution: str) -> None:
+        """Resolve open machine items of ``kind`` whose reason no longer arises."""
+        with self.tx() as c:
+            open_items = c.execute(
+                "SELECT id, reason FROM review_items WHERE record_id = ? AND kind = ? AND status = 'open'",
+                (record_id, kind),
+            ).fetchall()
+            for item in open_items:
+                if item["reason"] not in current:
+                    c.execute(
+                        "UPDATE review_items SET status = 'resolved', resolution = ?, resolved_at = ?"
+                        " WHERE id = ?",
+                        (resolution, now_iso(), item["id"]),
+                    )
+
     def resolve_review(self, item_id: int, resolution: str) -> None:
         with self.tx() as c:
             c.execute(

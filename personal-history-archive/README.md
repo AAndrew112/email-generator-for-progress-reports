@@ -186,6 +186,21 @@ mirror), set `journals.local_pdf_dir` and run
 - Folder and file names supply supporting evidence only. When a heading has
   no year and the path names exactly one year, that year is used and the
   date is marked `inferred`. Otherwise the entry stays undated.
+- Optional: with `journals.date_undated_from_filename = true`, an entry with
+  no usable written date takes the month or year its PDF's name points to,
+  marked `inferred` (the evidence records the PDF name and the reasoning).
+  A name gives at most a month, since a PDF holds many entries:
+  `journal june 2019` → `2019-06`, `journal 7.5.19` → `2019-07`,
+  `Journal 1998` → `1998`. Names covering a span (`june and july 2005`,
+  `starting jan 2002`) give only the year; a span into a new year
+  (`dec 20 2001 - january`) or a name with no year gives nothing, and the
+  entry stays undated. To apply it to journals already transcribed, without
+  running the vision model again:
+
+  ```bash
+  pha journals redate
+  pha export
+  ```
 - A written weekday that does not match the date, a year that conflicts with
   the folder, or an assumed century is flagged for review.
 - A time is extracted only when written in the entry heading.

@@ -4,6 +4,11 @@ Dates come from what is written at the top of each entry. Folder and file
 names only supply supporting evidence (e.g. the year when a heading says
 "March 4th"), and such dates are marked "inferred". Times are taken only
 when written in the entry heading.
+
+Optionally (``journals.date_undated_from_filename``), an entry with no
+usable written date takes the month or year its PDF's name points to,
+marked "inferred". A name gives at most a month: a PDF holds many entries,
+so a day in its name is not the day of any particular one.
 """
 
 from __future__ import annotations
@@ -145,6 +150,45 @@ def parse_written_date(text: str, date_order: str = "MDY", hints: list[int] | No
     return invalid
 
 
+_NAME_NUMERIC_RE = re.compile(r"(?<![\d.])(\d{1,2})[./\-](\d{1,2})[./\-](\d{4}|\d{2})(?![\d.])")
+_NAME_YEAR_MONTH_RE = re.compile(r"(?<!\d)(19[5-9]\d|20[0-4]\d)[./\-](\d{1,2})(?![\d.])")
+_NAME_MONTH_RE = re.compile(rf"(?<![a-z])({_MON})(?![a-z])", re.I)
+_NAME_RANGE_RE = re.compile(r"\b(?:until|till|starting|start|through|thru|since|from|to)\b", re.I)
+
+
+def date_from_filename(name: str, date_order: str = "MDY") -> tuple[str | None, str]:
+    """The month (YYYY-MM) or year (YYYY) a journal PDF's name points to.
+
+    Returns (date or None, explanation). Names covering a span ("starting
+    jan 2002", "june and july 2005") give only the year; spans across a new
+    year, or names with several years or none, give no date.
+    """
+    stem = re.sub(r"\.pdf$", "", name.strip(), flags=re.I)
+    m = _NAME_NUMERIC_RE.search(stem)
+    if m:
+        a, b = int(m.group(1)), int(m.group(2))
+        month = a if date_order.upper() == "MDY" else b
+        if month > 12:
+            month = b if month == a else a
+        year, _ = _resolve_year(m.group(3), [], [])
+        if 1 <= month <= 12:
+            return f"{year:04d}-{month:02d}", f"numeric date '{m.group(0)}' in the PDF name"
+    m = _NAME_YEAR_MONTH_RE.search(stem)
+    if m and 1 <= int(m.group(2)) <= 12:
+        return f"{m.group(1)}-{int(m.group(2)):02d}", f"'{m.group(0)}' in the PDF name"
+
+    years = year_hints(stem)
+    if len(years) != 1:
+        return None, ("no year in the PDF name" if not years else f"PDF name spans several years {years}")
+    year = years[0]
+    months = [MONTHS[t.lower()] for t in _NAME_MONTH_RE.findall(stem)]
+    if any(later < earlier for earlier, later in zip(months, months[1:])):
+        return None, "PDF name spans into a new year, so the year of each entry is unclear"
+    if len(set(months)) == 1 and not _NAME_RANGE_RE.search(stem):
+        return f"{year:04d}-{months[0]:02d}", "month and year in the PDF name"
+    return f"{year:04d}", "year in the PDF name" + (" (it names a span of months)" if months else "")
+
+
 def parse_written_time(text: str) -> tuple[str | None, list[str]]:
     m = _TIME_RE.search(text)
     if not m:
@@ -220,15 +264,35 @@ def split_entries(pages: list[tuple[int, str]], date_order: str = "MDY") -> list
     return entries
 
 
-def date_entry(entry: Entry, date_order: str, hints: list[int]) -> dict[str, Any]:
+def date_entry(
+    entry: Entry, date_order: str, hints: list[int], filename: str | None = None
+) -> dict[str, Any]:
+    """Date an entry from its heading; ``filename`` enables the PDF-name fallback."""
     header = entry.header()
     found = parse_written_date(header, date_order, hints)
     time, time_notes = parse_written_time(header) if found else (None, [])
     review: list[str] = []
-    if found is None:
-        review.append("no date written at the start of this entry")
-        return {"date": None, "time": None, "confidence": "unknown", "evidence": {"header": header}, "review": review}
-    if found.needs_review or found.date is None:
+    if found is None or found.date is None:
+        evidence: dict[str, Any] = {"header": header}
+        if found is not None:
+            evidence.update(written=found.written, notes=found.notes)
+        if filename:
+            name_date, why = date_from_filename(filename, date_order)
+            evidence["filename_date"] = {"filename": filename, "date": name_date, "basis": why}
+            if not name_date and "no year" in why and len(set(hints)) == 1:
+                name_date, why = f"{hints[0]:04d}", "year in the folder name"
+                evidence["filename_date"].update(date=name_date, basis=why)
+            if name_date:
+                evidence["notes"] = evidence.get("notes", []) + [
+                    f"no usable date written in the entry; {name_date} taken from the PDF name ({why})"
+                ]
+                return {"date": name_date, "time": None, "confidence": "inferred", "evidence": evidence, "review": []}
+        if found is None:
+            review.append("no date written at the start of this entry")
+        else:
+            review.extend(found.notes or ["date needs checking"])
+        return {"date": None, "time": None, "confidence": "unknown", "evidence": evidence, "review": review}
+    if found.needs_review:
         review.extend(found.notes or ["date needs checking"])
     if time_notes:
         review.extend(time_notes)

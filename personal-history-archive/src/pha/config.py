@@ -131,6 +131,9 @@ class JournalConfig:
     # Perceptual-hash Hamming distance at or below which two pages are
     # considered the same scan.
     duplicate_page_distance: int = 6
+    # Give entries with no written date the month or year their PDF's name
+    # points to (marked "inferred"). Off: such entries stay undated.
+    date_undated_from_filename: bool = False
 
 
 @dataclass
