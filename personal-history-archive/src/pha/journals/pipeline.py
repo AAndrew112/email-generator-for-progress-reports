@@ -20,7 +20,7 @@ from ..config import Config
 from ..db import Database, now_iso
 from ..runtime import Progress
 from . import drive as gdrive
-from .entries import date_entry, split_entries, year_hints
+from .entries import date_entries, split_entries, year_hints
 from .render import dhash, hamming, ink_ratio, page_count, render_page
 from .vision import BackendUnavailable, VisionBackend, make_backend, uncertainty_markers
 
@@ -279,15 +279,17 @@ class JournalPipeline:
         # Machine-transcribed pages are split into entries across page breaks.
         done = [(p["page_number"], p["raw_text"] or "") for p in pages if p["status"] == "done"]
         per_page_count: dict[int, int] = {}
-        for entry in split_entries(done, self.jc.date_order):
+        entries = split_entries(done, self.jc.date_order)
+        all_dated = date_entries(
+            entries, self.jc.date_order, hints,
+            filename=src["filename"] if self.jc.date_undated_from_filename else None,
+            neighbours=self.jc.date_undated_from_neighbours,
+        )
+        for entry, dated in zip(entries, all_dated):
             k = per_page_count.get(entry.start_page, 0)
             per_page_count[entry.start_page] = k + 1
             record_id = f"{source_id}-p{entry.start_page:04d}-{k:02d}"
             keep.add(record_id)
-            dated = date_entry(
-                entry, self.jc.date_order, hints,
-                src["filename"] if self.jc.date_undated_from_filename else None,
-            )
             backend_rows = [p for p in pages if entry.start_page <= p["page_number"] <= entry.end_page]
             markers = uncertainty_markers(entry.text)
             self.db.upsert_machine_record(
@@ -368,7 +370,8 @@ class JournalPipeline:
         counts = self.db.conn.execute(
             "SELECT SUM(COALESCE(corrected_date, machine_date) IS NOT NULL) AS dated,"
             " SUM(COALESCE(corrected_date, machine_date) IS NULL) AS undated,"
-            " SUM(timestamp_evidence LIKE '%taken from the PDF name%' AND corrected_date IS NULL) AS from_name"
+            " SUM(timestamp_evidence LIKE '%taken from the PDF name%' AND corrected_date IS NULL) AS from_name,"
+            " SUM(timestamp_evidence LIKE '%taken from the entry %' AND corrected_date IS NULL) AS from_neighbour"
             " FROM records WHERE source_type = ?",
             (SOURCE_TYPE,),
         ).fetchone()

@@ -194,8 +194,14 @@ mirror), set `journals.local_pdf_dir` and run
   `Journal 1998` → `1998`. Names covering a span (`june and july 2005`,
   `starting jan 2002`) give only the year; a span into a new year
   (`dec 20 2001 - january`) or a name with no year gives nothing, and the
-  entry stays undated. To apply it to journals already transcribed, without
-  running the vision model again:
+  entry stays undated.
+- Optional: with `journals.date_undated_from_neighbours = true`, an entry
+  with no usable written date first takes the written date of the nearest
+  entry before it in the same PDF (or after it, if it comes first), marked
+  `inferred`. When the PDF has no written dates, the PDF-name rule above
+  applies if it is on.
+- To apply either option to journals already transcribed, without running
+  the vision model again:
 
   ```bash
   pha journals redate

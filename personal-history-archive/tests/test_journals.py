@@ -8,6 +8,7 @@ from pha.config import Config
 from pha.export import export_archive
 from pha.journals import drive as gdrive
 from pha.journals.entries import (
+    date_entries,
     date_entry,
     date_from_filename,
     parse_written_date,
@@ -505,3 +506,27 @@ def test_dated_readings_split_and_dated():
 def test_full_date_mid_page_in_a_sentence_does_not_split():
     pages = [(1, "March 4, 1998\nToday was fun.\nOn 3/9/98 we go to\nthe zoo with grandma")]
     assert len(split_entries(pages)) == 1
+
+
+def test_undated_entries_take_nearest_written_date_when_enabled(cfg, db, tmp_path):
+    pdf = _setup(cfg, tmp_path)
+    sid = "jr-" + sha256_file(pdf)[:16]
+    cfg.journals.date_undated_from_neighbours = True
+    cfg.journals.date_undated_from_filename = True  # neighbours take precedence
+    JournalPipeline(cfg, db, backend_factory=lambda: _vision(sid)).run(source="local")
+    rec = db.get_record(f"{sid}-p0003-00")
+    assert (rec["machine_date"], rec["machine_time"], rec["machine_confidence"]) == ("1998-03-07", None, "inferred")
+    evidence = json.loads(rec["timestamp_evidence"])
+    assert evidence["neighbour_date"]["entry_pages"] == [2, 2]
+    assert not [i for i in db.review_items("open", "date") if i["record_id"] == rec["record_id"]]
+    assert JournalPipeline(cfg, db).redate()["from_neighbour"] == 1
+
+
+def test_leading_undated_entry_takes_next_date_and_no_dates_falls_back_to_name():
+    pages = [(1, "we got to the hotel"), (2, f"{ENTRY_MARKER}\nApril 6, 2004\nBeignets!")]
+    entries = split_entries(pages)
+    got = [d["date"] for d in date_entries(entries, "MDY", [], neighbours=True)]
+    assert got == ["2004-04-06", "2004-04-06"]
+    undated = split_entries([(1, "no dates here"), (2, f"{ENTRY_MARKER}\nnor here")])
+    assert [d["date"] for d in date_entries(undated, "MDY", [], "Journal 1998.pdf", neighbours=True)] == ["1998", "1998"]
+    assert [d["date"] for d in date_entries(undated, "MDY", [], None, neighbours=True)] == [None, None]

@@ -9,6 +9,10 @@ Optionally (``journals.date_undated_from_filename``), an entry with no
 usable written date takes the month or year its PDF's name points to,
 marked "inferred". A name gives at most a month: a PDF holds many entries,
 so a day in its name is not the day of any particular one.
+
+Optionally (``journals.date_undated_from_neighbours``), such an entry first
+takes the written date of the nearest entry before it in the same PDF (or
+after it, when it comes first), also marked "inferred".
 """
 
 from __future__ import annotations
@@ -348,3 +352,51 @@ def date_entry(
         },
         "review": review,
     }
+
+
+def date_entries(
+    entries: list[Entry],
+    date_order: str,
+    hints: list[int],
+    filename: str | None = None,
+    neighbours: bool = False,
+) -> list[dict[str, Any]]:
+    """Date every entry of one PDF, in order.
+
+    Entries without a usable written date take, when enabled, the written date
+    of the nearest earlier entry (the next one for leading entries), then the
+    PDF name's month or year (``filename``).
+    """
+    written = [date_entry(e, date_order, hints) for e in entries]
+    out: list[dict[str, Any]] = []
+    for i, (entry, dated) in enumerate(zip(entries, written)):
+        if dated["date"] is not None:
+            out.append(dated)
+            continue
+        near = None
+        if neighbours:
+            before = [(j, w) for j, w in enumerate(written[:i]) if w["date"]]
+            after = [(j, w) for j, w in enumerate(written) if j > i and w["date"]]
+            near = before[-1] if before else (after[0] if after else None)
+        if near is not None:
+            j, w = near
+            where = "before" if j < i else "after"
+            other = entries[j]
+            evidence = {
+                **dated["evidence"],
+                "neighbour_date": {
+                    "date": w["date"],
+                    "entry_pages": [other.start_page, other.end_page],
+                    "written": w["evidence"].get("written"),
+                },
+            }
+            evidence["notes"] = evidence.get("notes", []) + [
+                f"no usable date written in the entry; {w['date']} taken from the entry {where} it "
+                f"(pages {other.start_page}-{other.end_page})"
+            ]
+            out.append({"date": w["date"], "time": None, "confidence": "inferred", "evidence": evidence, "review": []})
+        elif filename:
+            out.append(date_entry(entry, date_order, hints, filename))
+        else:
+            out.append(dated)
+    return out

@@ -85,6 +85,7 @@ local_pdf_dir = ""       # alternative to Drive: a local folder of PDFs
 render_dpi = 200
 date_order = "MDY"       # how numeric dates like 3/4/98 are written: MDY or DMY
 duplicate_page_distance = 6
+date_undated_from_neighbours = false  # true: entries with no written date take the nearest dated entry's date in the same PDF ("inferred")
 date_undated_from_filename = false  # true: entries with no written date take the month/year in the PDF name ("inferred")
 
 [vision]

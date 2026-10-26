@@ -134,6 +134,9 @@ class JournalConfig:
     # Give entries with no written date the month or year their PDF's name
     # points to (marked "inferred"). Off: such entries stay undated.
     date_undated_from_filename: bool = False
+    # Before that, give them the written date of the nearest dated entry in
+    # the same PDF (the one before; the one after for leading entries).
+    date_undated_from_neighbours: bool = False
 
 
 @dataclass
