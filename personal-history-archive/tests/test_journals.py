@@ -8,6 +8,7 @@ from pha.config import Config
 from pha.export import export_archive
 from pha.journals import drive as gdrive
 from pha.journals.entries import (
+    date_entry,
     date_from_filename,
     parse_written_date,
     parse_written_time,
@@ -16,7 +17,7 @@ from pha.journals.entries import (
 )
 from pha.journals.evaluate import evaluate, score_pair
 from pha.journals.pipeline import JournalPipeline
-from pha.journals.vision import AnthropicBackend, CloudNotAuthorized, ManualBackend, OllamaBackend
+from pha.journals.vision import ENTRY_MARKER, AnthropicBackend, CloudNotAuthorized, ManualBackend, OllamaBackend
 from pha.runtime import sha256_file
 
 PAGE1 = """=== ENTRY ===
@@ -463,3 +464,44 @@ def test_ollama_persistent_server_error_reports_reason(cfg, tmp_path, monkeypatc
     img = _jpeg(tmp_path / "p0001.jpg", (3000, 4000))
     with pytest.raises(vision.requests.HTTPError, match="out of memory"):
         OllamaBackend(cfg).transcribe(img)
+
+
+def test_dated_readings_split_and_dated():
+    # Shapes seen in a real tarot notebook transcription.
+    pages = [
+        (1, "3/8/20 → J & I\n1. The now: 9 pent inv\nYou may be questioning"),
+        (2, "3a Clarify: 9 of wands\nResilience, courage"),
+        (3, "[blank page]"),
+        (7, "12/20\n12/23/20 Final Final Breakup w/ Chris spread\n① Where he is at: 6 cups"),
+        (8, "however\nFears and nightmares"),
+        (14, "4/4/21 Past - present - future spread\n① Past: Queen of pentacles"),
+        (15, "That way every particle of my\nbeing wants to be loved"),
+        (16, "4/29/21 B & I\n1 Where I'm at: 6 pent rev."),
+        (18, "5/22/21 - What do I need\nto know today?\n-Nine of pentacles"),
+        (20, f"5/23/21\n{ENTRY_MARKER}\n1) Oursuing the reading: Queen of Cups"),
+        (21, "Today Keisuke and I took the\nboys to the Ape Caves."),
+        (23, "7/13/21 Dan and I\n1 Where I am at: 5 cups inv"),
+        (24, "### ENTRY\n3 of swords (WIP)\nInitially a terrifying card"),
+        (25, "Past, Present, Future, Advice 7-24-21\n① Ace Pent. inverted"),
+    ]
+    entries = split_entries(pages)
+    hints = year_hints("2020.3.20 - 2021.7.13 tarot.pdf")
+    got = [(e.start_page, e.end_page, date_entry(e, "MDY", hints)["date"]) for e in entries]
+    assert got == [
+        (1, 2, "2020-03-08"),
+        (7, 8, "2020-12-23"),
+        (14, 15, "2021-04-04"),
+        (16, 16, "2021-04-29"),
+        (18, 18, "2021-05-22"),
+        (20, 21, "2021-05-23"),
+        (23, 23, "2021-07-13"),
+        (24, 24, None),
+        (25, 25, "2021-07-24"),
+    ]
+    assert all("ENTRY" not in e.text for e in entries)
+    assert entries[5].text.startswith("5/23/21\n1) Oursuing")
+
+
+def test_full_date_mid_page_in_a_sentence_does_not_split():
+    pages = [(1, "March 4, 1998\nToday was fun.\nOn 3/9/98 we go to\nthe zoo with grandma")]
+    assert len(split_entries(pages)) == 1

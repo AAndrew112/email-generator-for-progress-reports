@@ -62,6 +62,7 @@ class DateFinding:
     written: str
     notes: list[str] = field(default_factory=list)
     needs_review: bool = False
+    year_written: bool = False
 
 
 def year_hints(*texts: str) -> list[int]:
@@ -88,6 +89,15 @@ def _resolve_year(raw: str, hints: list[int], notes: list[str]) -> tuple[int, bo
     return year, False
 
 
+def _month_of(m: re.Match[str], kind: str, date_order: str) -> int:
+    g = m.groupdict()
+    if kind in ("numeric", "numeric_noyear"):
+        a, b = int(g["a"]), int(g["b"])
+        month = a if date_order.upper() == "MDY" else b
+        return (b if month == a else a) if month > 12 else month
+    return int(g["mon"]) if g["mon"].isdigit() else MONTHS[g["mon"].lower()]
+
+
 def parse_written_date(text: str, date_order: str = "MDY", hints: list[int] | None = None) -> DateFinding | None:
     hints = hints or []
     # Earliest match first; at the same position prefer the longest reading.
@@ -112,6 +122,12 @@ def parse_written_date(text: str, date_order: str = "MDY", hints: list[int] | No
             month = int(g["mon"]) if g["mon"].isdigit() else MONTHS[g["mon"].lower()]
             day = int(g["day"]) if g.get("day") else None
 
+        if not g.get("year") and any(
+            later.start() > m.start() and later.groupdict().get("year")
+            and _month_of(later, later_kind, date_order) == month
+            for later, later_kind in matches
+        ):
+            continue  # e.g. "12/20" above "12/23/20": the full date says more
         if g.get("year"):
             year, year_exact = _resolve_year(g["year"], hints, notes)
             exact = exact and year_exact
@@ -142,7 +158,7 @@ def parse_written_date(text: str, date_order: str = "MDY", hints: list[int] | No
                 notes.append(f"written weekday '{wd.group(1)}' does not match {iso}")
         if hints and not (min(hints) - 1 <= year <= max(hints) + 1):
             notes.append(f"year {year} conflicts with folder/file name years {hints}")
-        finding = DateFinding(iso, "exact" if exact else "inferred", m.group(0), notes)
+        finding = DateFinding(iso, "exact" if exact else "inferred", m.group(0), notes, year_written=bool(g.get("year")))
         finding.needs_review = bool(notes) and any(
             k in n for n in notes for k in ("does not match", "conflicts", "assumed", "differs")
         )
@@ -209,12 +225,26 @@ def parse_written_time(text: str) -> tuple[str | None, list[str]]:
     return f"{h:02d}:{mi:02d}", notes
 
 
-def _is_header(line: str, date_order: str) -> bool:
+_MARKER_VARIANT_RE = re.compile(r"^\s*(?:={2,}|#{2,})\s*ENTRY\s*(?:={2,}|#{2,})?\s*$", re.I)
+
+
+def _is_marker(line: str) -> bool:
+    """The model's entry marker, including near-misses such as '### ENTRY'."""
+    return line.strip() == ENTRY_MARKER or bool(_MARKER_VARIANT_RE.match(line))
+
+
+def _is_header(line: str, date_order: str, first_on_page: bool = False) -> bool:
     s = line.strip()
-    if not s or len(s) > 45:
+    if not s or len(s) > 60:
         return False
     found = parse_written_date(s, date_order)
     if found is None:
+        return False
+    # The first line of a page with a full date (day, month and year) starts an
+    # entry even with a title beside it ("7/13/21 Dan and I").
+    if first_on_page and found.year_written and found.date and len(found.date) == 10:
+        return True
+    if len(s) > 45:
         return False
     rest = s.replace(found.written, " ")
     rest = _WEEKDAY_RE.sub(" ", rest)
@@ -244,12 +274,22 @@ def split_entries(pages: list[tuple[int, str]], date_order: str = "MDY") -> list
     def has_content(e: Entry | None) -> bool:
         return e is not None and any(ln.strip() for ln in e.lines)
 
+    def only_headers(e: Entry | None) -> bool:
+        lines = [ln for ln in (e.lines if e else []) if ln.strip()]
+        return bool(lines) and all(_is_header(ln, date_order) for ln in lines)
+
     for page_number, text in pages:
         if text.strip() in ("[blank page]", ""):
             continue
+        first_on_page = True
         for line in text.splitlines():
-            is_marker = line.strip() == ENTRY_MARKER
-            if is_marker or (_is_header(line, date_order) and has_content(current)):
+            is_marker = _is_marker(line)
+            is_header = not is_marker and _is_header(line, date_order, first_on_page)
+            if line.strip():
+                first_on_page = False
+            if is_marker and only_headers(current):
+                continue  # marker written just after the date heading: same entry
+            if is_marker or (is_header and has_content(current)):
                 if has_content(current):
                     entries.append(current)  # type: ignore[arg-type]
                 current = Entry(page_number, page_number)
