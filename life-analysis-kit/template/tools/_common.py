@@ -51,3 +51,24 @@ def scan_candidates(texts: list[str], context: int = 30) -> list[dict[str, Any]]
         {"word": w, "count": n, "documents": len(docs[w]), "example": sample[w]}
         for w, n in counts.most_common()
     ]
+
+
+def rank_name_like(texts: list[str], context: int = 30) -> list[dict[str, Any]]:
+    """Capitalised words that are (almost) never written in lower case, most frequent first.
+
+    This is the same rule the pseudonymizer uses for its automatic catch-all, so the list shows
+    what would otherwise be replaced by a plain NAME_#### token.
+    """
+    cap: Counter[str] = Counter()
+    low: Counter[str] = Counter()
+    docs: defaultdict[str, set[int]] = defaultdict(set)
+    sample: dict[str, str] = {}
+    for i, text in enumerate(texts):
+        low.update(LOW_WORD.findall(text))
+        for m in CAP_WORD.finditer(text):
+            w = m.group(0)
+            cap[w] += 1
+            docs[w].add(i)
+            sample.setdefault(w, text[max(0, m.start() - context): m.end() + context].replace("\n", " "))
+    return [{"word": w, "count": n, "documents": len(docs[w]), "example": sample[w]}
+            for w, n in cap.most_common() if w not in STOP_CAPS and low[w.lower()] <= 0.25 * n]

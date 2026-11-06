@@ -307,7 +307,7 @@ def main() -> None:
     names_csv = root / "private" / "names_input.csv"
     if not names_csv.exists():
         if not args.allow_no_names:
-            sys.exit(f"Create {names_csv} first (see tools/names_input.example.csv).")
+            sys.exit(f"Create {names_csv} first (run tools/suggest_names.py, mark the sheet, then tools/build_names.py).")
         names_csv = None  # type: ignore[assignment]
 
     pz = Pseudonymizer(names_csv, ner=args.ner)

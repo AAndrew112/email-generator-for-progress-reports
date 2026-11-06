@@ -36,24 +36,31 @@ cd ~/life-analysis
 The archive file is copied into `raw/` and made read-only. File names, paths and the pipeline's record IDs are
 never carried into the analysis; only a pseudonymized title for journals.
 
-**2. Write a short names list** (you do **not** need to list everyone):
+**2. Mark up the candidate sheet** (you do **not** need to list everyone):
 ```bash
 python3 tools/suggest_names.py
+open private/name_candidates.csv        # or: open -e private/name_candidates.csv
 ```
-List only the people and places that matter most: you, family, partner, kids, close friends, exes, the
-workplaces, schools and towns you wrote about most. Roughly 20 to 40 rows, and the ranked candidates in
-`private/name_candidates.csv` show who comes up most. Everyone else (classmates, teachers, one-off people) is
-caught automatically in step 3. Edit `private/names_input.csv`, one row per person or place:
+Each row is a capitalized word from your transcripts, most frequent first, with an example sentence. The first
+rows of the file repeat these instructions. You only fill in three columns, and only on rows that matter:
 
-| column | meaning |
+| column | what to type |
 |---|---|
-| `name` | full name as you would write it |
-| `category` | `SUBJECT` (you), `PERSON`, `PARTNER`, `CHILD`, `FAMILY`, `WORKPLACE`, `SCHOOL`, `CITY`, `PLACE` |
-| `token` | optional label such as `PARTNER` or `CHILD_1`; blank gives `PERSON_001` and so on |
-| `aliases` | other spellings, nicknames, **speech-recognition misspellings**, separated by `;` |
-| `case_sensitive` | `yes` for names that are also words (Hope, Mark, Rose) so only the capitalized form is replaced |
+| `category` | `PERSON`, `PARTNER`, `CHILD`, `FAMILY`, `WORKPLACE`, `SCHOOL`, `CITY` or `PLACE`; `SUBJECT` for your own name. **Leave blank for everything else.** |
+| `same_as` | If the word is another spelling, nickname or surname of someone in another row, type that row's word (Pria: `Priya`). Leave `category` blank on it. |
+| `case_sensitive` | `yes` only if the word is also an ordinary word (Hope, Mark, Rose). |
 
-Listed names get meaningful labels (`[PARTNER]`, `[CHILD_1]`). Add new rows at the bottom; inserting in the middle renumbers tokens.
+If someone important (including you) is not in the sheet, add a row at the bottom with just the `word` and
+`category` filled in. Work down from the top and stop when the frequent rows stop being people who matter: roughly 20 to 40 rows.
+Everyone you skip (classmates, teachers, one-off people) is still hidden automatically in step 3. Save as CSV
+(plain text, not rich text), then:
+```bash
+python3 tools/build_names.py
+```
+This writes `private/names_input.csv` and warns about any mistake (an unknown category, a `same_as` that points
+nowhere). It is safe to run again after marking more rows: it only adds what is new. Listed people get meaningful
+labels (`[PARTNER_01]`, `[CHILD_01]`, `[PERSON_001]`); you can also edit `names_input.csv` by hand (columns:
+`name, category, token, aliases, case_sensitive`).
 
 **3. Pseudonymize and audit:**
 ```bash
@@ -111,7 +118,7 @@ Never paste real-name outputs into any assistant.
 
 ## What has and has not been tested
 
-Tested on **synthetic data only** (`tests/`, 19 tests): pseudonymization of planted names, aliases, misspellings, automatic catching and grouping of unlisted names,
+Tested on **synthetic data only** (`tests/`, 21 tests): pseudonymization of planted names, aliases, misspellings, automatic catching and grouping of unlisted names,
 emails, phones, URLs, handles and addresses; case-sensitive names; no file names or paths in the output;
 re-identification; chunk IDs and partial dates; search; era detection near a planted shift; the extraction
 validator (rejecting invented quotes); aggregation; the setup script and the deny rules. Not tested: real

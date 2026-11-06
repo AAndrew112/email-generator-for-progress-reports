@@ -255,3 +255,53 @@ def test_setup_script_refuses_synced_folders_and_makes_raw_readonly(tmp_path):
     assert "PASS  raw/archive.json is read-only" in ok.stdout
     assert "FAIL  private/names_input.csv exists" in ok.stdout
     os.chmod(dest / "raw", 0o700)
+
+
+def test_mark_up_sheet_builds_names_list_and_pseudonymizes(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    for d in ("raw", "private", "work"):
+        (r / d).mkdir(exist_ok=True)
+    synth.write_archive(r / "raw" / "archive.json")
+    run(r, "tools/suggest_names.py", "--min-count", "1")
+    sheet = r / "private" / "name_candidates.csv"
+    rows = list(csv.reader(open(sheet, encoding="utf-8")))
+    assert rows[0] == ["word", "count", "documents", "example", "category", "same_as", "case_sensitive"]
+    assert rows[1][0].startswith("# HOW TO FILL THIS IN") and sum(r_[0].startswith("#") for r_ in rows) == 5
+    assert (r / "private" / "names_input.csv").read_text().strip() == "name,category,token,aliases,case_sensitive"
+
+    marks = {"Priya": ("PERSON", ""), "Pria": ("", "Priya"), "Marcus": ("PARTNER", ""),
+             "Theo": ("CHILD", ""), "Duluth": ("CITY", "")}
+    out = []
+    for row in rows:
+        row = row + [""] * (7 - len(row))
+        if row[0] in marks:
+            row[4], row[5] = marks[row[0]]
+        out.append(row)
+    assert {row[0] for row in out} >= set(marks)
+    # someone missing from the sheet (here the author's own name) is added as a row at the bottom
+    out += [["Dana", "", "", "", "SUBJECT", "", ""], ["Whitfield", "", "", "", "", "Dana", ""]]
+    with open(sheet, "w", encoding="utf-8", newline="") as fh:
+        csv.writer(fh).writerows(out)
+    msg = run(r, "tools/build_names.py").stdout
+    assert "5 people/places added" in msg
+    names = {x["name"]: x for x in csv.DictReader(open(r / "private" / "names_input.csv"))}
+    assert names["Dana"]["token"] == "SUBJECT" and names["Dana"]["aliases"] == "Whitfield"
+    assert names["Priya"]["aliases"] == "Pria" and names["Marcus"]["category"] == "PARTNER"
+    assert "0 people/places added, 5 already listed" in run(r, "tools/build_names.py").stdout   # safe to repeat
+
+    run(r, "tools/pseudonymize.py")
+    text = " ".join(d["text"] for d in docs(r))
+    assert "[PERSON_001]" in text and "Priya" not in text and "Pria" not in text
+    assert "[SUBJECT]" in text and "[PARTNER_01]" in text and "[CHILD_01]" in text and "[CITY_01]" in text
+
+
+def test_build_names_reports_mistakes(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    (r / "private").mkdir(exist_ok=True)
+    (r / "private" / "name_candidates.csv").write_text(
+        "word,count,documents,example,category,same_as,case_sensitive\n"
+        "Alice,5,3,x,PEERSON,,\nAl,2,1,x,,Alicia,\n# note,,,,,,\n")
+    p = run(r, "tools/build_names.py", check=False)
+    assert p.returncode == 1 and "unknown category" in p.stdout and "not a word in this sheet" in p.stdout
