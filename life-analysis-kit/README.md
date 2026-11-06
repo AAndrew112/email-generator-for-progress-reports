@@ -46,10 +46,13 @@ rows of the file repeat these instructions. You only fill in three columns, and 
 
 | column | what to type |
 |---|---|
-| `category` | `PERSON`, `PARTNER`, `CHILD`, `FAMILY`, `WORKPLACE`, `SCHOOL`, `CITY` or `PLACE`; `SUBJECT` for your own name. **Leave blank for everything else.** |
+| `category` | `FRIEND`, `PARTNER`, `EXPARTNER`, `CHILD`, `SIBLING`, `PARENT`, `INLAW`, `FAMILY`, `COWORKER`, `PERSON`, `WORKPLACE`, `SCHOOL`, `CITY` or `PLACE`; `SUBJECT` for your own name. **Leave blank for everything else.** The role becomes the label (`[SIBLING_01]`), so the analysis knows who is who. |
 | `same_as` | If the word is another spelling, nickname or surname of someone in another row, type that row's word (Pria: `Priya`). Leave `category` blank on it. |
 | `case_sensitive` | `yes` only if the word is also an ordinary word (Hope, Mark, Rose). |
 
+**Shortcut:** instead of using the columns you can type a short note in the word cell, like
+`Tyler - brother`, `Holly - close friend, nicknames Holls, Shmolls`, or `York - unknown`. The tool reads the role
+and the nicknames from it (and discards the rest of the note). It prints what it understood so you can check.
 If someone important (including you) is not in the sheet, add a row at the bottom with just the `word` and
 `category` filled in. Work down from the top and stop when the frequent rows stop being people who matter: roughly 20 to 40 rows.
 Everyone you skip (classmates, teachers, one-off people) is still hidden automatically in step 3. Save as CSV

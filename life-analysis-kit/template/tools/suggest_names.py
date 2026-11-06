@@ -18,7 +18,8 @@ from _common import load_records, rank_name_like  # noqa: E402
 
 INSTRUCTIONS = [
     "# HOW TO FILL THIS IN (20-30 minutes). Each row below is a capitalised word from your transcripts, most frequent first.",
-    "# category: for people/places that matter, type PERSON, PARTNER, CHILD, FAMILY, WORKPLACE, SCHOOL, CITY or PLACE. Type SUBJECT for your own name. Leave BLANK for everything else (it is still hidden automatically).",
+    "# category: for people/places that matter, type FRIEND, PARTNER, EXPARTNER, CHILD, SIBLING, PARENT, INLAW, FAMILY, COWORKER, PERSON, WORKPLACE, SCHOOL, CITY or PLACE. Type SUBJECT for your own name. Leave BLANK for everything else (it is still hidden automatically).",
+    "# Shortcut: instead of the category column you can type a note in the word cell, like 'Tyler - brother' or 'Holly - close friend, nicknames Holls, Shmolls' or 'York - unknown'. Nicknames become spellings of that person.",
     "# same_as: if this word is another spelling, nickname or surname of someone in another row, type that other row's word here. Leave category blank on it. Example: row Pria -> same_as = Priya.",
     "# case_sensitive: type yes only if the word is also an ordinary word (Hope, Mark, Rose). Otherwise leave blank.",
     "# You can stop when the frequent rows run out of people who matter. Save as CSV, then run: python3 tools/build_names.py",

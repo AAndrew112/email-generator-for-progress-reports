@@ -267,7 +267,7 @@ def test_mark_up_sheet_builds_names_list_and_pseudonymizes(tmp_path):
     sheet = r / "private" / "name_candidates.csv"
     rows = list(csv.reader(open(sheet, encoding="utf-8")))
     assert rows[0] == ["word", "count", "documents", "example", "category", "same_as", "case_sensitive"]
-    assert rows[1][0].startswith("# HOW TO FILL THIS IN") and sum(r_[0].startswith("#") for r_ in rows) == 5
+    assert rows[1][0].startswith("# HOW TO FILL THIS IN") and sum(r_[0].startswith("#") for r_ in rows) == 6
     assert (r / "private" / "names_input.csv").read_text().strip() == "name,category,token,aliases,case_sensitive"
 
     marks = {"Priya": ("PERSON", ""), "Pria": ("", "Priya"), "Marcus": ("PARTNER", ""),
@@ -316,3 +316,32 @@ def test_build_names_says_so_when_nothing_is_marked(tmp_path):
     p = run(r, "tools/build_names.py", check=False)
     assert p.returncode == 1 and "No marked rows found" in (p.stdout + p.stderr)
     assert not (r / "private" / "names_input.csv").exists()
+
+
+def test_notes_typed_in_the_word_cell_are_understood(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    (r / "private").mkdir(exist_ok=True)
+    notes = [
+        "Wendell - Person, close friend, knicknames include Wen, Wendo",
+        "Orrin - brother", "Marisol - sister in law", "Pax - son of Wendell", "Ines - daughter of Wendell",
+        "Dana - subject (me)", "Kenji - ex husband, father of Taro and Yuki", "Yorkton - unknown",
+        "Taro - my son", "Brightwater - company I work for", "Lincoln High - school", "Duluth - city",
+        "Rosa - mom", "Tessa - coworker", "Gran - grandmother", "Lego", "Vale - nicknames: V, Vee",
+    ]
+    with open(r / "private" / "name_candidates.csv", "w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["word", "count", "documents", "example", "category", "same_as", "case_sensitive"])
+        for n in notes:
+            w.writerow([n, 5, 3, "x", "", "", ""])
+    out = run(r, "tools/build_names.py").stdout
+    rows = {x["name"]: x for x in csv.DictReader(open(r / "private" / "names_input.csv"))}
+    got = {k: v["category"] for k, v in rows.items()}
+    assert got == {"Wendell": "FRIEND", "Orrin": "SIBLING", "Marisol": "INLAW", "Pax": "PERSON", "Ines": "PERSON",
+                   "Dana": "SUBJECT", "Kenji": "EXPARTNER", "Taro": "CHILD", "Brightwater": "WORKPLACE",
+                   "Lincoln High": "SCHOOL", "Duluth": "CITY", "Rosa": "PARENT", "Tessa": "COWORKER",
+                   "Gran": "FAMILY", "Vale": "PERSON"}
+    assert "Yorkton" not in rows and "Lego" not in rows                     # unknown / unmarked: left to the catch-all
+    assert rows["Wendell"]["aliases"] == "Wen;Wendo" and rows["Vale"]["aliases"] == "V;Vee"
+    assert rows["Dana"]["token"] == "SUBJECT"
+    assert "Wendell -> FRIEND  (also: Wen, Wendo)" in out

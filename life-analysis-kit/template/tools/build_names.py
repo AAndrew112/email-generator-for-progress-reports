@@ -10,18 +10,73 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 import sys
 from pathlib import Path
 
-CATEGORIES = {"SUBJECT", "PERSON", "PARTNER", "CHILD", "FAMILY", "FRIEND", "WORKPLACE", "SCHOOL", "CITY", "PLACE"}
+CATEGORIES = {"SUBJECT", "PERSON", "FRIEND", "COWORKER", "PARTNER", "EXPARTNER", "CHILD", "SIBLING", "PARENT",
+              "INLAW", "FAMILY", "WORKPLACE", "SCHOOL", "CITY", "PLACE"}
 TRUTHY = {"yes", "y", "true", "1", "x"}
 FIELDS = ["name", "category", "token", "aliases", "case_sensitive"]
+
+
+NOTE_SPLIT = re.compile(r"\s[-\u2013\u2014:]\s")
+ALIAS_RX = re.compile(r"(?:k?nick\s?names?|a\.?k\.?a\.?|also called|goes by|called)(?:\s+(?:include|includes|are|is))?[:\s]+(.*)$", re.I)
+RULES = [  # first match wins; order matters
+    ("SUBJECT", re.compile(r"\bsubject\b|\(me\)|\bmyself\b|^me\b", re.I)),
+    ("EXPARTNER", re.compile(r"\bex[- ]?(husband|wife|boyfriend|girlfriend|partner|fianc)|\bformer (husband|wife|partner)", re.I)),
+    ("PARTNER", re.compile(r"\b(husband|wife|partner|boyfriend|girlfriend|fianc\w*|spouse)\b", re.I)),
+    ("CHILD", re.compile(r"\b(my|our) (son|daughter|child|kid|baby|stepson|stepdaughter)\b", re.I)),
+    ("INLAW", re.compile(r"\bin[- ]?law", re.I)),
+    ("SIBLING", re.compile(r"^(my )?(half[- ]?|step)?(brother|sister|sibling)\b", re.I)),
+    ("PARENT", re.compile(r"^(my )?(step)?(mother|mom|mum|mommy|father|dad|daddy|parent)\b", re.I)),
+    ("FAMILY", re.compile(r"\b(grand\w+|aunt|uncle|cousin|niece|nephew|stepmom|stepdad|relative|family)\b", re.I)),
+    ("FRIEND", re.compile(r"\bfriend\b", re.I)),
+    ("COWORKER", re.compile(r"\b(coworker|co-worker|colleague|boss|manager|supervisor)\b", re.I)),
+    ("PERSON", re.compile(r"\b(teacher|professor|neighbou?r|classmate|roommate|acquaintance|person|doctor|therapist)\b", re.I)),
+    ("WORKPLACE", re.compile(r"\b(workplace|company|employer|office|firm|business|work for|worked at)\b", re.I)),
+    ("SCHOOL", re.compile(r"\b(school|university|college|academy|kindergarten)\b", re.I)),
+    ("CITY", re.compile(r"\b(city|town|village|state|country|neighbou?rhood)\b", re.I)),
+    ("PLACE", re.compile(r"\b(place|restaurant|cafe|park|store|shop|hotel|beach|church|gym|hospital|camp)\b", re.I)),
+]
+
+
+def parse_note(note: str) -> tuple[str, list[str]]:
+    """Category and nicknames from a short note such as 'close friend, nicknames include Al, Ally'.
+
+    Returns ('', []) when the note says the word is unknown (it is then hidden by the automatic
+    catch-all with a plain NAME_ label). Everything else in the note is discarded, not saved.
+    """
+    if re.fullmatch(r"\W*(unknown|unsure|\?+|not sure|idk|n/?a)\W*", note.strip(), re.I):
+        return "", []
+    aliases: list[str] = []
+    m = ALIAS_RX.search(note)
+    if m:
+        aliases = [a.strip(" \"'.()") for a in re.split(r",|;|/|\band\b|\bor\b", m.group(1)) if a.strip(" \"'.()")]
+        note = note[: m.start()]
+    for category, rx in RULES:
+        if rx.search(note.strip()):
+            return category, aliases
+    return "PERSON", aliases
 
 
 def read_marked(path: Path) -> list[dict[str, str]]:
     with open(path, encoding="utf-8-sig", newline="") as fh:
         rows = [{k: (v or "").strip() for k, v in r.items() if k} for r in csv.DictReader(fh)]
-    return [r for r in rows if r.get("word") and not r["word"].startswith("#")]
+    out = []
+    for r in rows:
+        word = r.get("word", "")
+        if not word or word.startswith("#"):
+            continue
+        parts = NOTE_SPLIT.split(word, maxsplit=1)
+        if len(parts) == 2:  # a note typed into the word cell, e.g. "Tyler - brother"
+            r["word"] = parts[0].strip()
+            category, aliases = parse_note(parts[1])
+            r["note_category"], r["note_aliases"] = category, ";".join(aliases)
+            if category and not r.get("category"):
+                r["category"] = category
+        out.append(r)
+    return out
 
 
 def build(rows: list[dict[str, str]]) -> tuple[list[dict[str, str]], list[str]]:
@@ -56,6 +111,7 @@ def build(rows: list[dict[str, str]]) -> tuple[list[dict[str, str]], list[str]]:
         elif cat:
             e = entries.setdefault(r["word"].lower(), {"aliases": []})
             e.update(name=r["word"], category=cat, cs=r.get("case_sensitive", "").lower() in TRUTHY)
+            e["aliases"] += [a for a in r.get("note_aliases", "").split(";") if a]
     out: list[dict[str, str]] = []
     for key, e in entries.items():
         if "name" not in e:
@@ -112,6 +168,10 @@ def main() -> None:
         w.writeheader()
         w.writerows(existing)
     print(f"{added} people/places added, {skipped} already listed. names_input.csv now has {len(existing)} rows.")
+    if new:
+        print("What was understood (check this; it stays on your Mac):")
+        for e in new:
+            print(f"  {e['name']} -> {e['category']}" + (f"  (also: {e['aliases'].replace(';', ', ')})" if e["aliases"] else ""))
     for p in problems:
         print("  WARNING: " + p)
     if problems:
