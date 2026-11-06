@@ -305,3 +305,14 @@ def test_build_names_reports_mistakes(tmp_path):
         "Alice,5,3,x,PEERSON,,\nAl,2,1,x,,Alicia,\n# note,,,,,,\n")
     p = run(r, "tools/build_names.py", check=False)
     assert p.returncode == 1 and "unknown category" in p.stdout and "not a word in this sheet" in p.stdout
+
+
+def test_build_names_says_so_when_nothing_is_marked(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    (r / "private").mkdir(exist_ok=True)
+    (r / "private" / "name_candidates.csv").write_text(
+        "word,count,documents,example,category,same_as,case_sensitive\nAlice,5,3,x,,,\n")
+    p = run(r, "tools/build_names.py", check=False)
+    assert p.returncode == 1 and "No marked rows found" in (p.stdout + p.stderr)
+    assert not (r / "private" / "names_input.csv").exists()

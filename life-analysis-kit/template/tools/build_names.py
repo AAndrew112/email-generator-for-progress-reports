@@ -82,7 +82,16 @@ def main() -> None:
     ap.add_argument("--root", type=Path, default=root)
     args = ap.parse_args()
     private = args.root / "private"
-    new, problems = build(read_marked(private / "name_candidates.csv"))
+    marked = read_marked(private / "name_candidates.csv")
+    if not any(r.get("category") or r.get("same_as") for r in marked):
+        header = list(csv.reader(open(private / "name_candidates.csv", encoding="utf-8-sig")))[0]
+        sys.exit(
+            f"No marked rows found in {private / 'name_candidates.csv'}.\n"
+            f"  columns seen: {header}; data rows: {len(marked)}; rows with category or same_as: 0\n"
+            "  Most likely your edits were saved to a different file or format (Numbers/Excel 'Export to CSV' writes a new\n"
+            "  file). Export as CSV, save over this exact file, and keep the column headers unchanged."
+        )
+    new, problems = build(marked)
     target = private / "names_input.csv"
     existing: list[dict[str, str]] = []
     if target.exists():
