@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+"""OPERATOR-RUN ONLY. The analysis assistant must never run or read this tool's inputs.
+
+Reads  raw/archive.json (export from the archive pipeline) and private/names_input.csv
+Writes work/docs_pseudo.jsonl            pseudonymized documents (what the assistant may read)
+       work/pseudonymization_report.json counts only; no names
+       private/key.json                  token -> real strings (used by rehydrate.py)
+       private/residual_candidates.csv   capitalised words that are still in the text
+
+What it does, in order, per document:
+  1. redacts emails, phone numbers, URLs, @handles, street addresses, long ID numbers
+  2. replaces every name, alias, workplace, school and place from names_input.csv
+  3. optionally (--ner) replaces extra names/places found by spaCy, if installed
+Source file names and paths are never copied: only a pseudonymized title for journals.
+
+Everything is local. Nothing is sent over the network.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+import re
+import sys
+from collections import Counter, defaultdict
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _common import load_records, scan_candidates  # noqa: E402
+
+TRUTHY = {"yes", "y", "true", "1"}
+REDACTIONS = [
+    ("EMAIL", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
+    ("URL", re.compile(r"(?:https?://|www\.)\S+")),
+    ("HANDLE", re.compile(r"(?<![\w@])@[A-Za-z0-9_.]{2,}")),
+    ("PHONE", re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}(?!\d)")),
+    ("ADDRESS", re.compile(
+        r"\b\d{1,5}\s+(?:[A-Z][a-z]+\s+){1,3}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|"
+        r"Drive|Dr|Court|Ct|Way|Place|Pl|Terrace|Circle)\b\.?")),
+    ("ID_NUM", re.compile(r"(?<!\d)(?:\d{3}-\d{2}-\d{4}|\d{9,})(?!\d)")),
+]
+NER_LABELS = {"PERSON": "PERSON_NER", "GPE": "PLACE_NER", "LOC": "PLACE_NER", "FAC": "PLACE_NER",
+              "ORG": "ORG_NER"}
+
+
+class Pseudonymizer:
+    def __init__(self, names_csv: Path | None, ner: bool = False) -> None:
+        self.key: dict[str, Counter[str]] = defaultdict(Counter)
+        self.hits: Counter[str] = Counter()
+        self.redaction_ids: dict[str, dict[str, str]] = defaultdict(dict)
+        self.ner_ids: dict[str, str] = {}
+        self.entries: list[tuple[str, str, bool]] = []
+        self.tokens_declared: list[str] = []
+        if names_csv is not None:
+            self._load_names(names_csv)
+        norm = lambda x: re.sub(r"\s+", " ", x)  # noqa: E731
+        ci = {norm(s).lower(): t for s, t, cs in self.entries if not cs}
+        cs_map = {norm(s): t for s, t, cs in self.entries if cs}
+        self._ci_map, self._cs_map = ci, cs_map
+        self._ci_re = self._build(ci.keys(), re.I)
+        self._cs_re = self._build(cs_map.keys(), 0)
+        self.nlp = None
+        if ner:
+            try:
+                import spacy
+
+                self.nlp = spacy.load("en_core_web_sm")
+            except Exception as exc:  # noqa: BLE001
+                print(f"NER unavailable ({exc}); continuing without it.", file=sys.stderr)
+
+    @staticmethod
+    def _build(keys: Any, flags: int) -> re.Pattern[str] | None:
+        keys = sorted(keys, key=len, reverse=True)
+        if not keys:
+            return None
+        alt = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in keys)
+        return re.compile(rf"(?<![A-Za-z0-9_])(?:{alt})(?![A-Za-z0-9_])", flags)
+
+    def _load_names(self, path: Path) -> None:
+        counters: Counter[str] = Counter()
+        claimed: dict[str, str] = {}
+        with open(path, encoding="utf-8-sig", newline="") as fh:
+            for row in csv.DictReader(fh):
+                name = (row.get("name") or "").strip()
+                if not name or name.startswith("#"):
+                    continue
+                cat = (row.get("category") or "PERSON").strip().upper()
+                token = (row.get("token") or "").strip().upper().strip("[]")
+                if not token:
+                    if cat == "SUBJECT":
+                        token = "SUBJECT"
+                    else:
+                        counters[cat] += 1
+                        token = f"{cat}_{counters[cat]:0{3 if cat == 'PERSON' else 2}d}"
+                cs = (row.get("case_sensitive") or "").strip().lower() in TRUTHY
+                surfaces = [name] + [a.strip() for a in (row.get("aliases") or "").split(";") if a.strip()]
+                for s in surfaces:
+                    k = s if cs else s.lower()
+                    if claimed.get(k, token) != token:
+                        raise SystemExit(f"'{s}' is listed for two different tokens; fix names_input.csv")
+                    claimed[k] = token
+                    self.entries.append((s, token, cs))
+                if token not in self.tokens_declared:
+                    self.tokens_declared.append(token)
+
+    # --- replacement steps -------------------------------------------------
+    def _redact(self, text: str) -> str:
+        for kind, rx in REDACTIONS:
+            def sub(m: re.Match[str], kind: str = kind) -> str:
+                ids = self.redaction_ids[kind]
+                tok = ids.setdefault(m.group(0), f"{kind}_{len(ids) + 1:02d}")
+                self.key[tok][m.group(0)] += 1
+                self.hits[tok] += 1
+                return f"[{tok}]"
+
+            text = rx.sub(sub, text)
+        return text
+
+    def _names(self, text: str) -> str:
+        def replacer(table: dict[str, str], fold: bool):
+            def sub(m: re.Match[str]) -> str:
+                flat = re.sub(r"\s+", " ", m.group(0))
+                tok = table[flat.lower() if fold else flat]
+                self.key[tok][flat] += 1
+                self.hits[tok] += 1
+                return f"[{tok}]"
+
+            return sub
+
+        if self._cs_re:
+            text = self._cs_re.sub(replacer(self._cs_map, False), text)
+        if self._ci_re:
+            text = self._ci_re.sub(replacer(self._ci_map, True), text)
+        return text
+
+    def _ner(self, text: str) -> str:
+        if self.nlp is None:
+            return text
+        out, last = [], 0
+        for ent in self.nlp(text).ents:
+            if ent.label_ not in NER_LABELS or "[" in ent.text or "]" in ent.text:
+                continue
+            prefix = NER_LABELS[ent.label_]
+            tok = self.ner_ids.setdefault(f"{prefix}|{ent.text}", f"{prefix}_{len(self.ner_ids) + 1:03d}")
+            self.key[tok][ent.text] += 1
+            self.hits[tok] += 1
+            out += [text[last:ent.start_char], f"[{tok}]"]
+            last = ent.end_char
+        return "".join(out) + text[last:]
+
+    def __call__(self, text: str) -> str:
+        return self._ner(self._names(self._redact(text)))
+
+
+def quality_of(rec: dict[str, Any]) -> dict[str, Any]:
+    text = rec.get("transcript") or ""
+    detail = (rec.get("metadata") or {}).get("transcript_detail") or {}
+    segments = detail.get("segments") or []
+    uncertain = detail.get("uncertain_segments") or []
+    return {
+        "transcription_status": rec.get("transcription_status"),
+        "illegible_markers": len(re.findall(r"\[illegible", text)),
+        "uncertain_markers": len(re.findall(r"\[\?[^\]]*\?\]", text)),
+        "low_confidence_fraction": round(len(uncertain) / len(segments), 3) if segments else None,
+        "review_required": bool(rec.get("review_required")),
+    }
+
+
+def build_docs(records: list[dict[str, Any]], pz: Pseudonymizer) -> tuple[list[dict[str, Any]], int]:
+    docs, empty = [], 0
+    for rec in sorted(records, key=lambda r: (r.get("date") or "9999", r.get("time") or "", r["record_id"])):
+        text = (rec.get("transcript") or "").strip()
+        if not text:
+            empty += 1
+            continue
+        is_journal = rec.get("source_type") == "journal"
+        date = rec.get("date")
+        docs.append({
+            "doc_id": "D-" + hashlib.sha1(rec["record_id"].encode()).hexdigest()[:10],
+            "kind": "journal" if is_journal else "chat",
+            "date": date,
+            "date_precision": {10: "day", 7: "month", 4: "year"}.get(len(date or ""), None),
+            "time": rec.get("time"),
+            "timezone": rec.get("timezone"),
+            "date_confidence": rec.get("timestamp_confidence"),
+            "duration_s": rec.get("duration"),
+            "page": rec.get("page_number"),
+            "source_label": pz(Path(rec.get("source_filename") or "").stem) if is_journal else None,
+            "quality": quality_of(rec),
+            "text": pz(text),
+        })
+    return docs, empty
+
+
+def main() -> None:
+    root_default = Path(__file__).resolve().parents[1]
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--root", type=Path, default=root_default)
+    ap.add_argument("--input", type=Path, help="default: <root>/raw/archive.json")
+    ap.add_argument("--ner", action="store_true", help="also use spaCy NER if installed")
+    ap.add_argument("--allow-no-names", action="store_true", help="testing only")
+    args = ap.parse_args()
+    root: Path = args.root
+    names_csv = root / "private" / "names_input.csv"
+    if not names_csv.exists():
+        if not args.allow_no_names:
+            sys.exit(f"Create {names_csv} first (see tools/names_input.example.csv).")
+        names_csv = None  # type: ignore[assignment]
+
+    pz = Pseudonymizer(names_csv, ner=args.ner)
+    records = load_records(args.input or root / "raw" / "archive.json")
+    docs, empty = build_docs(records, pz)
+
+    work, private = root / "work", root / "private"
+    work.mkdir(exist_ok=True)
+    private.mkdir(exist_ok=True)
+    with open(work / "docs_pseudo.jsonl", "w", encoding="utf-8") as fh:
+        for d in docs:
+            fh.write(json.dumps(d, ensure_ascii=False) + "\n")
+
+    residual = scan_candidates([d["text"] for d in docs])
+    with open(private / "residual_candidates.csv", "w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=["word", "count", "documents", "example"])
+        w.writeheader()
+        w.writerows(residual)
+    with open(private / "key.json", "w", encoding="utf-8") as fh:
+        json.dump({t: dict(c) for t, c in pz.key.items()}, fh, ensure_ascii=False, indent=1)
+
+    n_words = sum(len(d["text"].split()) for d in docs) or 1
+    by_cat: Counter[str] = Counter()
+    for tok, n in pz.hits.items():
+        by_cat[re.sub(r"_?\d+$", "", tok)] += n
+    report = {
+        "documents": len(docs),
+        "empty_documents_skipped": empty,
+        "words": n_words,
+        "replacements_by_category": dict(sorted(by_cat.items())),
+        "tokens_declared": len(pz.tokens_declared),
+        "tokens_never_matched": sorted(t for t in pz.tokens_declared if pz.hits[t] == 0),
+        "tokens_matching_over_5_per_1000_words": sorted(
+            t for t, n in pz.hits.items() if t in pz.tokens_declared and n / n_words * 1000 > 5),
+        "residual_capitalised_words": len(residual),
+        "residual_occurrences": sum(r["count"] for r in residual),
+        "ner_used": pz.nlp is not None,
+    }
+    (work / "pseudonymization_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(json.dumps(report, indent=2))
+    print(f"\nNext: open {private / 'residual_candidates.csv'}. Any real name there means add it to "
+          "names_input.csv (append at the end) and run this tool again.")
+
+
+if __name__ == "__main__":
+    main()

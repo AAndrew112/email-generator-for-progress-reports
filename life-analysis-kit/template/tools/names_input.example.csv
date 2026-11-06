@@ -1,0 +1,9 @@
+name,category,token,aliases,case_sensitive
+Your Full Name,SUBJECT,SUBJECT,Your First Name;Nickname,
+Example Friend,PERSON,,Friendy;Exampel Friend,
+Example Partner,PARTNER,PARTNER,Partner First Name,
+Example Child,CHILD,CHILD_1,Kiddo,
+Hope,PERSON,,,yes
+Acme Corp,WORKPLACE,,Acme,
+Springfield High,SCHOOL,,,
+Portland,CITY,,,

@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "deny": [
+      "WebFetch",
+      "WebSearch",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(rsync:*)",
+      "Bash(nc:*)",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(python tools/*)",
+      "Bash(python3 tools/*)",
+      "Bash(./tools/*)",
+      "Read(./private/**)",
+      "Read(./out_real/**)",
+      "Read(./tools/**)",
+      "Edit(./raw/**)",
+      "Write(./raw/**)",
+      "Edit(./private/**)",
+      "Write(./private/**)",
+      "Edit(./tools/**)",
+      "Write(./tools/**)",
+      "Bash(python3 ./tools/*)",
+      "Bash(python ./tools/*)",
+      "Bash(bash tools/*)",
+      "Bash(sh tools/*)",
+      "Bash(cat private/*)",
+      "Bash(ls private*)",
+      "Bash(cat ./private/*)",
+      "Bash(ls ./private*)"
+    ]
+  }
+}
