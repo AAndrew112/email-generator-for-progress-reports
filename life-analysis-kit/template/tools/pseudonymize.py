@@ -10,7 +10,12 @@ Writes work/docs_pseudo.jsonl            pseudonymized documents (what the assis
 What it does, in order, per document:
   1. redacts emails, phone numbers, URLs, @handles, street addresses, long ID numbers
   2. replaces every name, alias, workplace, school and place from names_input.csv
-  3. optionally (--ner) replaces extra names/places found by spaCy, if installed
+  3. catches the rest automatically: every capitalised word that is almost never written in lower
+     case anywhere in the corpus is treated as a name (token NAME_####). This covers the long tail
+     (classmates, teachers, one-off people) so you only list the people who matter. Spelling variants
+     and first+last names are grouped under one token; private/auto_groups.csv shows each group. Words you
+     want left alone go in private/not_names.txt, one per line. Use --no-auto to turn this off.
+  4. optionally (--ner) replaces extra names/places found by spaCy, if installed
 Source file names and paths are never copied: only a pseudonymized title for journals.
 
 Everything is local. Nothing is sent over the network.
@@ -20,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import difflib
 import hashlib
 import json
 import re
@@ -29,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import load_records, scan_candidates  # noqa: E402
+from _common import CAP_WORD, LOW_WORD, STOP_CAPS, load_records, scan_candidates  # noqa: E402
 
 TRUTHY = {"yes", "y", "true", "1"}
 REDACTIONS = [
@@ -63,6 +69,11 @@ class Pseudonymizer:
         self._ci_re = self._build(ci.keys(), re.I)
         self._cs_re = self._build(cs_map.keys(), 0)
         self.nlp = None
+        self.recording = True
+        self.auto_re: re.Pattern[str] | None = None
+        self.auto_ids: dict[str, str] = {}
+        self.auto_groups: list[tuple[str, list[str], int]] = []
+        self.not_names: set[str] = set()
         if ner:
             try:
                 import spacy
@@ -106,14 +117,18 @@ class Pseudonymizer:
                 if token not in self.tokens_declared:
                     self.tokens_declared.append(token)
 
+    def _hit(self, tok: str, real: str) -> None:
+        if self.recording:
+            self.key[tok][real] += 1
+            self.hits[tok] += 1
+
     # --- replacement steps -------------------------------------------------
     def _redact(self, text: str) -> str:
         for kind, rx in REDACTIONS:
             def sub(m: re.Match[str], kind: str = kind) -> str:
                 ids = self.redaction_ids[kind]
                 tok = ids.setdefault(m.group(0), f"{kind}_{len(ids) + 1:02d}")
-                self.key[tok][m.group(0)] += 1
-                self.hits[tok] += 1
+                self._hit(tok, m.group(0))
                 return f"[{tok}]"
 
             text = rx.sub(sub, text)
@@ -124,8 +139,7 @@ class Pseudonymizer:
             def sub(m: re.Match[str]) -> str:
                 flat = re.sub(r"\s+", " ", m.group(0))
                 tok = table[flat.lower() if fold else flat]
-                self.key[tok][flat] += 1
-                self.hits[tok] += 1
+                self._hit(tok, flat)
                 return f"[{tok}]"
 
             return sub
@@ -145,14 +159,98 @@ class Pseudonymizer:
                 continue
             prefix = NER_LABELS[ent.label_]
             tok = self.ner_ids.setdefault(f"{prefix}|{ent.text}", f"{prefix}_{len(self.ner_ids) + 1:03d}")
-            self.key[tok][ent.text] += 1
-            self.hits[tok] += 1
+            self._hit(tok, ent.text)
             out += [text[last:ent.start_char], f"[{tok}]"]
             last = ent.end_char
         return "".join(out) + text[last:]
 
-    def __call__(self, text: str) -> str:
+    def base(self, text: str) -> str:
         return self._ner(self._names(self._redact(text)))
+
+    def learn_auto_names(self, texts: list[str], not_names: set[str]) -> int:
+        """Find name-like words in the whole corpus: capitalised words that are (almost) never
+        written in lower case. Ordinary words (So, Like, Maybe) also appear lower-case, names do not.
+        """
+        self.not_names = not_names
+        self.recording = False
+        base = [self.base(t) for t in texts]
+        self.recording = True
+        cap: Counter[str] = Counter()
+        low: Counter[str] = Counter()
+        for t in base:
+            cap.update(CAP_WORD.findall(t))
+            low.update(LOW_WORD.findall(t))
+        names = [w for w, n in cap.items()
+                 if w not in STOP_CAPS and w not in not_names and low[w.lower()] <= 0.25 * n]
+        self.auto_groups = self._group(names, cap, base)
+        self.auto_ids = {w: tok for tok, members, _ in self.auto_groups for w in members}
+        names = list(self.auto_ids)
+        if names:
+            alt = "|".join(re.escape(w) for w in sorted(names, key=len, reverse=True))
+            self.auto_re = re.compile(rf"(?<![A-Za-z0-9_\[])(?:{alt})(?![A-Za-z0-9_\]])")
+        return len(self.auto_groups)
+
+    @staticmethod
+    def _group(names: list[str], cap: Counter[str], base: list[str]) -> list[tuple[str, list[str], int]]:
+        """Group words that are probably the same person or place under one token.
+
+        Two conservative rules: (1) two name words written side by side at least twice ("Jane Smith")
+        belong together; (2) a rare variant spelling (misrecognition such as Pria for Priya) joins
+        the frequent word it resembles. Two frequent look-alikes (Sara, Sarah) stay separate.
+        """
+        parent = {w: w for w in names}
+
+        def find(x: str) -> str:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a: str, b: str) -> None:
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[max(ra, rb, key=lambda w: (-cap[w], w))] = min(ra, rb, key=lambda w: (-cap[w], w))
+
+        known = set(names)
+        pairs: Counter[tuple[str, str]] = Counter()
+        pair_rx = re.compile(r"(?<![A-Za-z0-9_\[])([A-Z][a-z]{2,}) ([A-Z][a-z]{2,})(?![A-Za-z0-9_\]])")
+        for t in base:
+            for a, b in pair_rx.findall(t):
+                if a in known and b in known:
+                    pairs[(a, b)] += 1
+        for (a, b), n in sorted(pairs.items()):
+            if n >= 2:
+                union(a, b)
+        by_letter: dict[str, list[str]] = defaultdict(list)
+        for w in sorted(names, key=lambda w: (-cap[w], w)):
+            by_letter[w[0]].append(w)
+        for words in by_letter.values():
+            for i, big in enumerate(words):
+                for small in words[i + 1:]:
+                    if (len(big) >= 4 and len(small) >= 4 and abs(len(big) - len(small)) <= 2
+                            and cap[small] <= max(3, 0.2 * cap[big])
+                            and difflib.SequenceMatcher(None, big.lower(), small.lower()).ratio() >= 0.86):
+                        union(small, big)
+        groups: dict[str, list[str]] = defaultdict(list)
+        for w in names:
+            groups[find(w)].append(w)
+        ordered = sorted(groups.values(), key=lambda g: (-sum(cap[w] for w in g), min(g)))
+        return [(f"NAME_{i:04d}", sorted(g, key=lambda w: (-cap[w], w)), sum(cap[w] for w in g))
+                for i, g in enumerate(ordered, 1)]
+
+    def _auto(self, text: str) -> str:
+        if self.auto_re is None:
+            return text
+
+        def sub(m: re.Match[str]) -> str:
+            tok = self.auto_ids[m.group(0)]
+            self._hit(tok, m.group(0))
+            return f"[{tok}]"
+
+        return self.auto_re.sub(sub, text)
+
+    def __call__(self, text: str) -> str:
+        return self._auto(self.base(text))
 
 
 def quality_of(rec: dict[str, Any]) -> dict[str, Any]:
@@ -201,6 +299,8 @@ def main() -> None:
     ap.add_argument("--root", type=Path, default=root_default)
     ap.add_argument("--input", type=Path, help="default: <root>/raw/archive.json")
     ap.add_argument("--ner", action="store_true", help="also use spaCy NER if installed")
+    ap.add_argument("--no-auto", action="store_true",
+                    help="only replace names listed in names_input.csv (no automatic catch-all)")
     ap.add_argument("--allow-no-names", action="store_true", help="testing only")
     args = ap.parse_args()
     root: Path = args.root
@@ -212,6 +312,13 @@ def main() -> None:
 
     pz = Pseudonymizer(names_csv, ner=args.ner)
     records = load_records(args.input or root / "raw" / "archive.json")
+    auto_words = 0
+    if not args.no_auto:
+        protect = root / "private" / "not_names.txt"
+        keep = {w.strip() for w in protect.read_text(encoding="utf-8").splitlines() if w.strip()} if protect.exists() else set()
+        texts = [(r.get("transcript") or "") for r in records]
+        texts += [Path(r.get("source_filename") or "").stem for r in records if r.get("source_type") == "journal"]
+        auto_words = pz.learn_auto_names(texts, keep)
     docs, empty = build_docs(records, pz)
 
     work, private = root / "work", root / "private"
@@ -226,6 +333,11 @@ def main() -> None:
         w = csv.DictWriter(fh, fieldnames=["word", "count", "documents", "example"])
         w.writeheader()
         w.writerows(residual)
+    with open(private / "auto_groups.csv", "w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["token", "occurrences", "words_grouped_together"])
+        for tok, members, total in pz.auto_groups:
+            w.writerow([tok, total, "; ".join(members)])
     with open(private / "key.json", "w", encoding="utf-8") as fh:
         json.dump({t: dict(c) for t, c in pz.key.items()}, fh, ensure_ascii=False, indent=1)
 
@@ -245,6 +357,8 @@ def main() -> None:
         "residual_capitalised_words": len(residual),
         "residual_occurrences": sum(r["count"] for r in residual),
         "ner_used": pz.nlp is not None,
+        "automatic_catch_all": not args.no_auto,
+        "auto_name_groups": auto_words,
     }
     (work / "pseudonymization_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))

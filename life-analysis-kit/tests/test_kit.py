@@ -64,13 +64,56 @@ def test_no_filenames_or_paths_leak_into_documents(root):
     assert labels == {"[SUBJECT] trip to [CITY_01]"}
 
 
-def test_unlisted_name_is_reported_privately_not_in_work(root):
-    cands = {r["word"] for r in csv.DictReader(open(root / "private" / "residual_candidates.csv"))}
-    assert "Bronwyn" in cands
-    assert "Bronwyn" in (root / "work" / "docs_pseudo.jsonl").read_text()  # still visible: the audit must catch it
+def test_unlisted_names_are_caught_automatically(root):
+    text = " ".join(d["text"] for d in docs(root))
+    assert "Bronwyn" not in text and "Zelda" not in text      # never in the names list
+    assert re.search(r"\[NAME_\d{4}\] came over later", text)   # sentence-start-only name
+    assert re.search(r"then \[NAME_\d{4}\] laughed at", text, re.I)
+    # ordinary capitalised words are left alone
+    assert "Anyway" in text and "Deadline" in text and text.count("[NAME_") < 40
     rep = json.loads((root / "work" / "pseudonymization_report.json").read_text())
-    assert rep["residual_capitalised_words"] >= 1 and "Bronwyn" not in json.dumps(rep)
-    assert rep["empty_documents_skipped"] == 1
+    assert rep["automatic_catch_all"] and rep["auto_name_groups"] >= 3 and rep["empty_documents_skipped"] == 1
+    assert "Bronwyn" not in json.dumps(rep)
+    key = json.loads((root / "private" / "key.json").read_text())
+    assert any("Bronwyn" in seen for tok, seen in key.items() if tok.startswith("NAME_"))
+
+
+def test_variants_and_full_names_share_a_token_but_lookalikes_do_not(root):
+    key = json.loads((root / "private" / "key.json").read_text())
+    holders = {t: set(seen) for t, seen in key.items() if t.startswith("NAME_")}
+    odessa = [t for t, seen in holders.items() if "Odessa" in seen]
+    assert len(odessa) == 1 and {"Odessa", "Brandt", "Odesa"} <= holders[odessa[0]]
+    sara = [t for t, seen in holders.items() if "Sara" in seen]
+    sarah = [t for t, seen in holders.items() if "Sarah" in seen]
+    assert sara and sarah and sara != sarah                      # two frequent look-alikes stay apart
+    groups = list(csv.DictReader(open(root / "private" / "auto_groups.csv")))
+    assert any("Odesa" in g["words_grouped_together"] and "Brandt" in g["words_grouped_together"] for g in groups)
+
+
+def test_without_auto_the_unlisted_name_is_only_reported_privately(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    for d in ("raw", "private", "work"):
+        (r / d).mkdir(exist_ok=True)
+    synth.write_archive(r / "raw" / "archive.json")
+    (r / "private" / "names_input.csv").write_text(synth.NAMES_CSV, encoding="utf-8")
+    run(r, "tools/pseudonymize.py", "--no-auto")
+    assert "Bronwyn" in (r / "work" / "docs_pseudo.jsonl").read_text()
+    cands = {x["word"] for x in csv.DictReader(open(r / "private" / "residual_candidates.csv"))}
+    assert "Bronwyn" in cands
+
+
+def test_not_names_file_protects_words(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    for d in ("raw", "private", "work"):
+        (r / d).mkdir(exist_ok=True)
+    synth.write_archive(r / "raw" / "archive.json")
+    (r / "private" / "names_input.csv").write_text(synth.NAMES_CSV, encoding="utf-8")
+    (r / "private" / "not_names.txt").write_text("Zelda\n")
+    run(r, "tools/pseudonymize.py")
+    text = (r / "work" / "docs_pseudo.jsonl").read_text()
+    assert "Zelda came over later" in text and "Bronwyn" not in text
 
 
 def test_rehydrate_restores_real_names(root):

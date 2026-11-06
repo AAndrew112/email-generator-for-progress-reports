@@ -15,8 +15,13 @@ STOP_CAPS = {
     "November", "December", "Christmas", "Thanksgiving", "Easter", "Halloween", "Valentine",
     "Google", "Facebook", "Instagram", "Netflix", "Amazon", "Zoom", "Marco", "Polo", "Apple",
     "Mom", "Dad", "Mommy", "Daddy", "Grandma", "Grandpa", "Hey", "Hello", "Thanks", "Thank",
+    "Hmm", "Mmm", "Ugh", "Wow", "Whoa", "Mhm", "Huh", "Ooh", "Aww", "Yay", "Yep", "Nope", "Alright",
+    "Oops", "Gosh", "Geez", "Dude", "Girl", "Guys", "Please", "Sorry", "Anyways", "Honestly",
     "American", "English", "Spanish", "Mexican", "Italian", "French", "Chinese", "Covid",
 }
+
+CAP_WORD = re.compile(r"\b[A-Z][a-z]{2,}(?:[A-Z][a-z]+)*\b")
+LOW_WORD = re.compile(r"\b[a-z]{3,}\b")
 
 # A capitalised word that follows lower-case text, a digit or a comma is probably a name.
 _MID_SENTENCE_CAP = re.compile(r"(?<=[a-z0-9,;] )[A-Z][a-z]{2,}\b")

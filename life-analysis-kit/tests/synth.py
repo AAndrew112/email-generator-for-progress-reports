@@ -18,6 +18,7 @@ PLANTED = {
     "Brightwater": "workplace", "Lincoln Middle": "school", "Duluth": "city",
     "dana.w@example.com": "email", "867-5309": "phone", "example.com/dana": "url",
     "@dana_w": "handle", "42 Maple Street": "address",
+    "Bronwyn": "unlisted friend, mid-sentence", "Odessa": "unlisted full name", "Brandt": "its surname", "Odesa": "its misspelling", "Sarah": "look-alike 1", "Sara": "look-alike 2", "Zelda": "unlisted friend, sentence start only",
 }
 NAMES_CSV = """name,category,token,aliases,case_sensitive
 Dana Whitfield,SUBJECT,SUBJECT,Dana;Whitfield,
@@ -67,7 +68,7 @@ def make_records(seed: int = 7) -> list[dict]:
                 if (year, month, k) == (2019, 3, 0):
                     text += (" Hi it's Dana. I told Priya Natarajan to email me at dana.w@example.com or call (612) 867-5309. "
                              "Marcus said see https://example.com/dana or @dana_w. We live at 42 Maple Street. "
-                             "Pria and Theo came to Brightwater in Duluth. I hope Hope is fine. Then Bronwyn laughed at Lincoln Middle.")
+                             "Pria and Theo came to Brightwater in Duluth. I hope Hope is fine. Then Bronwyn laughed at Lincoln Middle. Zelda came over later. Odessa Brandt visited. Odessa Brandt left. Then Odessa called. Odesa texted. Sara called. Sara left. Sara won. Sara sang. Sarah called. Sarah left. Sarah won. Sarah sang.")
                 add("marco_polo", f"{year}-{month:02d}-{rng.randint(1, 28):02d}", text)
     for month in range(1, 7):
         for _ in range(3):

@@ -36,12 +36,14 @@ cd ~/life-analysis
 The archive file is copied into `raw/` and made read-only. File names, paths and the pipeline's record IDs are
 never carried into the analysis; only a pseudonymized title for journals.
 
-**2. Write your names list** (the step that decides how safe this is):
+**2. Write a short names list** (you do **not** need to list everyone):
 ```bash
 python3 tools/suggest_names.py
 ```
-Open `private/name_candidates.csv` (frequent capitalized words, to jog your memory) and edit
-`private/names_input.csv`. One row per person or place:
+List only the people and places that matter most: you, family, partner, kids, close friends, exes, the
+workplaces, schools and towns you wrote about most. Roughly 20 to 40 rows, and the ranked candidates in
+`private/name_candidates.csv` show who comes up most. Everyone else (classmates, teachers, one-off people) is
+caught automatically in step 3. Edit `private/names_input.csv`, one row per person or place:
 
 | column | meaning |
 |---|---|
@@ -51,18 +53,29 @@ Open `private/name_candidates.csv` (frequent capitalized words, to jog your memo
 | `aliases` | other spellings, nicknames, **speech-recognition misspellings**, separated by `;` |
 | `case_sensitive` | `yes` for names that are also words (Hope, Mark, Rose) so only the capitalized form is replaced |
 
-Include your own name and nicknames (`SUBJECT`), family, partners, kids, friends, workplaces, schools, towns,
-neighborhoods, group chat names. **Add new rows at the bottom**; inserting in the middle renumbers tokens.
+Listed names get meaningful labels (`[PARTNER]`, `[CHILD_1]`). Add new rows at the bottom; inserting in the middle renumbers tokens.
 
 **3. Pseudonymize and audit:**
 ```bash
 python3 tools/pseudonymize.py
 ```
-Read the printed report, then open `private/residual_candidates.csv`: these are capitalized words still in the
-text. Any real name, place or organization there goes into `names_input.csv`; run the tool again. Repeat until the
-list holds only ordinary words. Also check `tokens_never_matched` (a typo in your list) and
-`tokens_matching_over_5_per_1000_words` (a name that is also a common word; set `case_sensitive`).
-Do this **before** the analysis begins: re-running it later renumbers tokens and invalidates findings.
+What it does for everything you did not list: any capitalized word that is almost never written in lower case
+anywhere in your corpus is treated as a name and replaced by `[NAME_0001]` and so on. Spelling variants and
+first-plus-last names are grouped under one token (Priya / Pria, "Jane Smith" / Jane / Smith). Frequent look-alikes
+(Sara, Sarah) stay separate. This is deliberately aggressive: it may also redact an unusual capitalized word that
+is not a name, which costs a little detail but not safety.
+
+Then check three files in `private/` (they hold real names, so never share them):
+- `auto_groups.csv`: the groups it made, biggest first. Skim the top 40. If two different people were merged,
+  or someone important got a plain `NAME_` label, add them to `names_input.csv` (explicit rows win), then re-run.
+- `residual_candidates.csv`: capitalized words still in the text. These are mostly words that are both names and
+  ordinary words (Will, Mark, Grace, Rose). Add real people to `names_input.csv` with `case_sensitive = yes`.
+- `not_names.txt` (create it if needed): one word per line that must **not** be replaced, if the tool over-redacted
+  something you want kept.
+
+Also read the printed report: `tokens_never_matched` means a typo in your list. Do all this **before** the
+analysis begins: re-running later renumbers tokens and invalidates findings. Use `--no-auto` to turn off the
+catch-all and replace only your listed names.
 
 **4. Check the guardrails:**
 ```bash
@@ -98,7 +111,7 @@ Never paste real-name outputs into any assistant.
 
 ## What has and has not been tested
 
-Tested on **synthetic data only** (`tests/`, 16 tests): pseudonymization of planted names, aliases, misspellings,
+Tested on **synthetic data only** (`tests/`, 19 tests): pseudonymization of planted names, aliases, misspellings, automatic catching and grouping of unlisted names,
 emails, phones, URLs, handles and addresses; case-sensitive names; no file names or paths in the output;
 re-identification; chunk IDs and partial dates; search; era detection near a planted shift; the extraction
 validator (rejecting invented quotes); aggregation; the setup script and the deny rules. Not tested: real
