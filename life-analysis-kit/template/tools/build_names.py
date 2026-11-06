@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import re
 import sys
 from pathlib import Path
 
 CATEGORIES = {"SUBJECT", "PERSON", "FRIEND", "COWORKER", "PARTNER", "EXPARTNER", "CHILD", "SIBLING", "PARENT",
-              "INLAW", "FAMILY", "WORKPLACE", "SCHOOL", "CITY", "PLACE"}
+              "INLAW", "FAMILY", "PET", "FICTION", "WORKPLACE", "SCHOOL", "CITY", "PLACE"}
 TRUTHY = {"yes", "y", "true", "1", "x"}
 FIELDS = ["name", "category", "token", "aliases", "case_sensitive"]
 
@@ -33,6 +34,8 @@ RULES = [  # first match wins; order matters
     ("FAMILY", re.compile(r"\b(grand\w+|aunt|uncle|cousin|niece|nephew|stepmom|stepdad|relative|family)\b", re.I)),
     ("FRIEND", re.compile(r"\bfriend\b", re.I)),
     ("COWORKER", re.compile(r"\b(coworker|co-worker|colleague|boss|manager|supervisor)\b", re.I)),
+    ("PET", re.compile(r"\b(pet|(my|our|family|childhood) (cat|dog|kitten|puppy)|dog|cat)\b", re.I)),
+    ("FICTION", re.compile(r"\b(character|fiction|story I wrote|creative writing)\b", re.I)),
     ("PERSON", re.compile(r"\b(teacher|professor|neighbou?r|classmate|roommate|acquaintance|person|doctor|therapist)\b", re.I)),
     ("WORKPLACE", re.compile(r"\b(workplace|company|employer|office|firm|business|work for|worked at)\b", re.I)),
     ("SCHOOL", re.compile(r"\b(school|university|college|academy|kindergarten)\b", re.I)),
@@ -60,11 +63,19 @@ def parse_note(note: str) -> tuple[str, list[str]]:
     return "PERSON", aliases
 
 
+def load_sheet(path: Path) -> tuple[list[str], list[dict[str, str]]]:
+    """Header row and data rows. Lines above the header (a spreadsheet's title line) are ignored."""
+    table = list(csv.reader(io.StringIO(path.read_text(encoding="utf-8-sig"))))
+    for i, row in enumerate(table):
+        header = [c.strip().lower() for c in row]
+        if "word" in header and "category" in header:
+            return header, [{h: (c or "").strip() for h, c in zip(header, r) if h} for r in table[i + 1:]]
+    return [], []
+
+
 def read_marked(path: Path) -> list[dict[str, str]]:
-    with open(path, encoding="utf-8-sig", newline="") as fh:
-        rows = [{k: (v or "").strip() for k, v in r.items() if k} for r in csv.DictReader(fh)]
     out = []
-    for r in rows:
+    for r in load_sheet(path)[1]:
         word = r.get("word", "")
         if not word or word.startswith("#"):
             continue
@@ -140,10 +151,12 @@ def main() -> None:
     private = args.root / "private"
     marked = read_marked(private / "name_candidates.csv")
     if not any(r.get("category") or r.get("same_as") for r in marked):
-        header = list(csv.reader(open(private / "name_candidates.csv", encoding="utf-8-sig")))[0]
+        header, _ = load_sheet(private / "name_candidates.csv")
+        first = (private / "name_candidates.csv").read_text(encoding="utf-8-sig").splitlines()[:1]
         sys.exit(
             f"No marked rows found in {private / 'name_candidates.csv'}.\n"
-            f"  columns seen: {header}; data rows: {len(marked)}; rows with category or same_as: 0\n"
+            f"  columns seen: {header or 'no header row containing word and category (first line: ' + repr(first[0][:40] if first else '') + ')'}; "
+            f"data rows: {len(marked)}; rows with category or same_as: 0\n"
             "  Most likely your edits were saved to a different file or format (Numbers/Excel 'Export to CSV' writes a new\n"
             "  file). Export as CSV, save over this exact file, and keep the column headers unchanged."
         )

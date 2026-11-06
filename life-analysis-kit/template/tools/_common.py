@@ -15,6 +15,8 @@ STOP_CAPS = {
     "November", "December", "Christmas", "Thanksgiving", "Easter", "Halloween", "Valentine",
     "Google", "Facebook", "Instagram", "Netflix", "Amazon", "Zoom", "Marco", "Polo", "Apple",
     "Mom", "Dad", "Mommy", "Daddy", "Grandma", "Grandpa", "Hey", "Hello", "Thanks", "Thank",
+    "Jan", "Feb", "Mar", "Apr", "Aug", "Sept", "Oct", "Nov", "Dec", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat",
+    "Sun", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays",
     "Hmm", "Mmm", "Ugh", "Wow", "Whoa", "Mhm", "Huh", "Ooh", "Aww", "Yay", "Yep", "Nope", "Alright",
     "Oops", "Gosh", "Geez", "Dude", "Girl", "Guys", "Please", "Sorry", "Anyways", "Honestly",
     "American", "English", "Spanish", "Mexican", "Italian", "French", "Chinese", "Covid",

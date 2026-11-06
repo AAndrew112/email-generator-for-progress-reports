@@ -345,3 +345,27 @@ def test_notes_typed_in_the_word_cell_are_understood(tmp_path):
     assert rows["Wendell"]["aliases"] == "Wen;Wendo" and rows["Vale"]["aliases"] == "V;Vee"
     assert rows["Dana"]["token"] == "SUBJECT"
     assert "Wendell -> FRIEND  (also: Wen, Wendo)" in out
+
+
+def test_sheet_with_a_title_line_above_the_header_and_new_categories(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    (r / "private").mkdir(exist_ok=True)
+    (r / "private" / "name_candidates.csv").write_text(
+        "name_candidates\nword,category,same_as,case_sensitive,count\n"
+        "# a comment row,,,,\nZiggy,PET,,,5\nGhanno,FICTION,,,4\nZig,,Ziggy,,2\nRex - my pet dog,,,,3\n")
+    out = run(r, "tools/build_names.py").stdout
+    rows = {x["name"]: x for x in csv.DictReader(open(r / "private" / "names_input.csv"))}
+    assert rows["Ziggy"]["category"] == "PET" and rows["Ziggy"]["aliases"] == "Zig"
+    assert rows["Ghanno"]["category"] == "FICTION" and rows["Rex"]["category"] == "PET"
+    assert "3 people/places added" in out
+
+
+def test_month_and_weekday_abbreviations_are_not_treated_as_names(root):
+    text = " ".join(d["text"] for d in docs(root))
+    assert "[NAME_" not in "Jan. 20 Dec 3 Fri night Sun"  # sanity of the literal
+    sys.path.insert(0, str(TEMPLATE / "tools"))
+    import _common
+    for w in ("Jan", "Feb", "Dec", "Sept", "Fri", "Sundays"):
+        assert w in _common.STOP_CAPS
+    assert text
