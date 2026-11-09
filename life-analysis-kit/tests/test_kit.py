@@ -392,3 +392,8 @@ def test_name_does_not_match_inside_a_contraction_and_residuals_skip_ordinary_wo
     cands = {x["word"] for x in csv.DictReader(open(r / "private" / "residual_candidates.csv"))}
     assert "Grace" in cands and "Hope" in cands                              # names that are also words: reviewed
     assert "Today" not in cands                                              # ordinary word with a capital: not
+
+
+def test_generated_csv_files_use_plain_line_endings(root):
+    for name in ("residual_candidates.csv", "auto_groups.csv"):
+        assert b"\r" not in (root / "private" / name).read_bytes()

@@ -39,7 +39,7 @@ def main() -> None:
     records = load_records(args.root / "raw" / "archive.json")
     cands = [c for c in rank_name_like([r.get("transcript") or "" for r in records]) if c["count"] >= args.min_count]
     with open(private / "name_candidates.csv", "w", encoding="utf-8", newline="") as fh:
-        w = csv.writer(fh)
+        w = csv.writer(fh, lineterminator="\n")
         w.writerow(FIELDS)
         for line in INSTRUCTIONS:
             w.writerow([line])

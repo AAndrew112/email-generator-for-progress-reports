@@ -331,11 +331,11 @@ def main() -> None:
 
     residual = scan_candidates([d["text"] for d in docs], ratio=0.3)
     with open(private / "residual_candidates.csv", "w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=["word", "count", "documents", "example"])
+        w = csv.DictWriter(fh, fieldnames=["word", "count", "documents", "example"], lineterminator="\n")
         w.writeheader()
         w.writerows(residual)
     with open(private / "auto_groups.csv", "w", encoding="utf-8", newline="") as fh:
-        w = csv.writer(fh)
+        w = csv.writer(fh, lineterminator="\n")
         w.writerow(["token", "occurrences", "words_grouped_together"])
         for tok, members, total in pz.auto_groups:
             w.writerow([tok, total, "; ".join(members)])

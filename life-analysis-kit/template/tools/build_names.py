@@ -177,7 +177,7 @@ def main() -> None:
         listed.update(s.lower() for s in surfaces)
         added += 1
     with open(target, "w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
+        w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore", lineterminator="\n")
         w.writeheader()
         w.writerows(existing)
     print(f"{added} people/places added, {skipped} already listed. names_input.csv now has {len(existing)} rows.")
