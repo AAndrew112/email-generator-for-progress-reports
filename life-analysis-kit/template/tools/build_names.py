@@ -167,20 +167,34 @@ def main() -> None:
         with open(target, encoding="utf-8-sig", newline="") as fh:
             existing = [r for r in csv.DictReader(fh) if (r.get("name") or "").strip()]
     listed = {s.strip().lower() for r in existing for s in [r["name"], *(r.get("aliases") or "").split(";")] if s.strip()}
-    added = skipped = 0
+    by_name = {r["name"].strip().lower(): r for r in existing}
+    added = extended = unchanged = 0
     for e in new:
         surfaces = [e["name"], *[a for a in e["aliases"].split(";") if a]]
-        if any(s.lower() in listed for s in surfaces):
-            skipped += 1
+        row = by_name.get(e["name"].lower())
+        if row is not None:  # a person already listed: add any spellings that are new
+            fresh = [a for a in surfaces[1:] if a.lower() not in listed]
+            if fresh:
+                have = [a.strip() for a in (row.get("aliases") or "").split(";") if a.strip()]
+                row["aliases"] = ";".join(have + fresh)
+                listed.update(a.lower() for a in fresh)
+                extended += len(fresh)
+            else:
+                unchanged += 1
+            continue
+        if any(x.lower() in listed for x in surfaces):  # the word is already listed under someone else
+            unchanged += 1
             continue
         existing.append({k: e.get(k, "") for k in FIELDS})
-        listed.update(s.lower() for s in surfaces)
+        by_name[e["name"].lower()] = existing[-1]
+        listed.update(x.lower() for x in surfaces)
         added += 1
     with open(target, "w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore", lineterminator="\n")
         w.writeheader()
         w.writerows(existing)
-    print(f"{added} people/places added, {skipped} already listed. names_input.csv now has {len(existing)} rows.")
+    print(f"{added} people/places added, {extended} new spellings added to people already listed, "
+          f"{unchanged} already up to date. names_input.csv now has {len(existing)} rows.")
     if new:
         print("What was understood (check this; it stays on your Mac):")
         for e in new:

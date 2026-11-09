@@ -288,7 +288,7 @@ def test_mark_up_sheet_builds_names_list_and_pseudonymizes(tmp_path):
     names = {x["name"]: x for x in csv.DictReader(open(r / "private" / "names_input.csv"))}
     assert names["Dana"]["token"] == "SUBJECT" and names["Dana"]["aliases"] == "Whitfield"
     assert names["Priya"]["aliases"] == "Pria" and names["Marcus"]["category"] == "PARTNER"
-    assert "0 people/places added, 5 already listed" in run(r, "tools/build_names.py").stdout   # safe to repeat
+    assert "0 people/places added, 0 new spellings added to people already listed, 5 already up to date" in run(r, "tools/build_names.py").stdout   # safe to repeat
 
     run(r, "tools/pseudonymize.py")
     text = " ".join(d["text"] for d in docs(r))
@@ -397,3 +397,20 @@ def test_name_does_not_match_inside_a_contraction_and_residuals_skip_ordinary_wo
 def test_generated_csv_files_use_plain_line_endings(root):
     for name in ("residual_candidates.csv", "auto_groups.csv"):
         assert b"\r" not in (root / "private" / name).read_bytes()
+
+
+def test_new_spellings_are_added_to_people_already_in_the_list(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    (r / "private").mkdir(exist_ok=True)
+    sheet = r / "private" / "name_candidates.csv"
+    head = "word,category,same_as,case_sensitive\n"
+    sheet.write_text(head + "Priya,PERSON,,\nPria,,Priya,\n")
+    run(r, "tools/build_names.py")
+    sheet.write_text(head + "Priya,PERSON,,\nPria,,Priya,\nPreeya,,Priya,\nPriyah,,Priya,\nOrleans,CITY,,\n")
+    out = run(r, "tools/build_names.py").stdout
+    rows = {x["name"]: x for x in csv.DictReader(open(r / "private" / "names_input.csv"))}
+    assert rows["Priya"]["aliases"] == "Pria;Preeya;Priyah" and "Orleans" in rows
+    assert "1 people/places added, 2 new spellings added to people already listed" in out
+    again = run(r, "tools/build_names.py").stdout
+    assert "0 people/places added, 0 new spellings" in again
