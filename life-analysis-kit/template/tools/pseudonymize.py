@@ -88,7 +88,8 @@ class Pseudonymizer:
         if not keys:
             return None
         alt = "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in keys)
-        return re.compile(rf"(?<![A-Za-z0-9_])(?:{alt})(?![A-Za-z0-9_])", flags)
+        # "Don" must not match inside "don't": an apostrophe + t is a contraction, not a name ending.
+        return re.compile(rf"(?<![A-Za-z0-9_])(?:{alt})(?![A-Za-z0-9_]|['\u2019]t\b)", flags)
 
     def _load_names(self, path: Path) -> None:
         counters: Counter[str] = Counter()
@@ -328,7 +329,7 @@ def main() -> None:
         for d in docs:
             fh.write(json.dumps(d, ensure_ascii=False) + "\n")
 
-    residual = scan_candidates([d["text"] for d in docs])
+    residual = scan_candidates([d["text"] for d in docs], ratio=0.3)
     with open(private / "residual_candidates.csv", "w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=["word", "count", "documents", "example"])
         w.writeheader()

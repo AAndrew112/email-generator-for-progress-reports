@@ -369,3 +369,26 @@ def test_month_and_weekday_abbreviations_are_not_treated_as_names(root):
     for w in ("Jan", "Feb", "Dec", "Sept", "Fri", "Sundays"):
         assert w in _common.STOP_CAPS
     assert text
+
+
+def test_name_does_not_match_inside_a_contraction_and_residuals_skip_ordinary_words(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    for d in ("raw", "private", "work"):
+        (r / d).mkdir(exist_ok=True)
+    filler = " ".join(["today we talked about tomorrow and anyway the weather"] * 5)
+    text = (f"I don't know. Don't go. Don said hi and Don's here. We can't wait, Today was fine. {filler} "
+            "Grace came by. I felt grace for once. Then Grace left. Hope you know hope is nice, Hope said.")
+    rec = {"record_id": "mp-1", "source_type": "marco_polo", "date": "2020-01-02", "time": "10:00:00",
+           "timezone": "-08:00", "timestamp_confidence": "exact", "transcript": text, "source_filename": "x.mp4",
+           "source_location": "/x", "page_number": None, "duration": 1.0, "speaker_verification": None,
+           "transcription_status": "machine", "review_required": False, "metadata": {}}
+    (r / "raw" / "archive.json").write_text(json.dumps({"records": [rec], "undated_records": []}))
+    (r / "private" / "names_input.csv").write_text("name,category,token,aliases,case_sensitive\nDon,PARTNER,,Dom,\n")
+    run(r, "tools/pseudonymize.py", "--no-auto")
+    out = docs(r)[0]["text"]
+    assert "I don't know. Don't go." in out and "can't wait" in out          # contractions untouched
+    assert "[PARTNER_01] said hi and [PARTNER_01]'s here" in out            # real mentions replaced, possessive kept
+    cands = {x["word"] for x in csv.DictReader(open(r / "private" / "residual_candidates.csv"))}
+    assert "Grace" in cands and "Hope" in cands                              # names that are also words: reviewed
+    assert "Today" not in cands                                              # ordinary word with a capital: not

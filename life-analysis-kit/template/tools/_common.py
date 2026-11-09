@@ -40,11 +40,18 @@ def candidate_words(text: str) -> Iterator[tuple[str, int]]:
             yield m.group(0), m.start()
 
 
-def scan_candidates(texts: list[str], context: int = 30) -> list[dict[str, Any]]:
+def scan_candidates(texts: list[str], context: int = 30, ratio: float = 0.0) -> list[dict[str, Any]]:
+    """Capitalised words in mid-sentence. With ``ratio`` > 0, keep only words that are capitalised
+    at least that share of the time (names that are also ordinary words, like Will or Rose), which
+    drops ordinary words that merely got a capital letter (Today, Anyway).
+    """
     counts: Counter[str] = Counter()
+    low: Counter[str] = Counter()
     docs: defaultdict[str, set[int]] = defaultdict(set)
     sample: dict[str, str] = {}
     for i, text in enumerate(texts):
+        if ratio:
+            low.update(LOW_WORD.findall(text))
         for word, pos in candidate_words(text):
             counts[word] += 1
             docs[word].add(i)
@@ -52,6 +59,7 @@ def scan_candidates(texts: list[str], context: int = 30) -> list[dict[str, Any]]
     return [
         {"word": w, "count": n, "documents": len(docs[w]), "example": sample[w]}
         for w, n in counts.most_common()
+        if not ratio or n / (n + low[w.lower()]) >= ratio
     ]
 
 
