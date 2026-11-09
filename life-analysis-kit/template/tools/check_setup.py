@@ -10,7 +10,7 @@ from pathlib import Path
 
 SYNCED = ("Mobile Documents", "iCloud", "Dropbox", "Google Drive", "GoogleDrive", "OneDrive", "Box Sync")
 REQUIRED_DENY = ["WebFetch", "WebSearch", "Bash(curl:*)", "Bash(wget:*)", "Read(./private/**)",
-                 "Read(./out_real/**)", "Edit(./raw/**)", "Write(./raw/**)"]
+                 "Read(./out_real/**)", "Edit(./raw/**)", "Edit(./private/**)"]
 
 
 def main() -> int:
@@ -27,6 +27,10 @@ def main() -> int:
         deny = json.loads(settings.read_text()).get("permissions", {}).get("deny", [])
     for rule in REQUIRED_DENY:
         check(rule in deny, f"settings.json denies {rule}")
+    perms = json.loads(settings.read_text()).get("permissions", {}) if settings.exists() else {}
+    check(perms.get("defaultMode") in ("acceptEdits", "default"),
+          "permission mode is not auto or bypass (you approve commands)")
+    check(not any(r.startswith("Write(") for r in deny), "no Write(...) deny rules (Claude Code ignores them; Edit(...) covers writes)")
     archive = root / "raw" / "archive.json"
     check(archive.exists(), "raw/archive.json is present")
     check(archive.exists() and not (archive.stat().st_mode & 0o222), "raw/archive.json is read-only")

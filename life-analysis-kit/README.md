@@ -22,7 +22,8 @@ add your export, and run Claude Code there. Your corpus never goes through the c
 2. Python 3.10+ and `pip install numpy scikit-learn` (optional: `vaderSentiment` for valence; `spacy` plus its
    English model for the optional extra name finder, which is untested in this kit).
 3. Claude Code installed on the Mac.
-4. In Claude Code, **turn off MCP connectors** (Gmail, Drive, and so on) for this folder.
+4. In Claude Code, **use the default or accept-edits permission mode, never auto or bypass** (the bottom line shows the
+   mode; Shift+Tab cycles it), so you approve every command except the analysis scripts. **Turn off MCP connectors** (Gmail, Drive, and so on) for this folder.
 
 ## Steps (about 2 to 3 hours of your time, mostly step 2)
 
@@ -126,5 +127,5 @@ emails, phones, URLs, handles and addresses; case-sensitive names; no file names
 re-identification; chunk IDs and partial dates; search; era detection near a planted shift; the extraction
 validator (rejecting invented quotes); aggregation; the setup script and the deny rules. Not tested: real
 transcripts, the optional spaCy name finder, and Claude Code's behavior with the deny rules on your version
-(`check_setup.py` verifies the file, not enforcement; try asking the assistant to read `private/` once to confirm
-it is refused). Pseudonymization quality on your real data depends on your names list and is checked at Checkpoint 1.
+(`check_setup.py` verifies the file, not enforcement. Asking the assistant to read `private/` only tests its
+instructions, since it refuses on its own; in Claude Code run `/permissions` and confirm the deny rules are listed). Pseudonymization quality on your real data depends on your names list and is checked at Checkpoint 1.

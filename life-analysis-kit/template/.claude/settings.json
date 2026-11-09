@@ -1,5 +1,10 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(python work/scripts/*)",
+      "Bash(python3 work/scripts/*)"
+    ],
     "deny": [
       "WebFetch",
       "WebSearch",
@@ -18,11 +23,8 @@
       "Read(./out_real/**)",
       "Read(./tools/**)",
       "Edit(./raw/**)",
-      "Write(./raw/**)",
       "Edit(./private/**)",
-      "Write(./private/**)",
       "Edit(./tools/**)",
-      "Write(./tools/**)",
       "Bash(python3 ./tools/*)",
       "Bash(python ./tools/*)",
       "Bash(bash tools/*)",

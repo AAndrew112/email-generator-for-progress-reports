@@ -238,8 +238,12 @@ def test_analysis_scripts_cannot_reach_private_data_or_network():
 def test_settings_deny_rules_cover_the_brief():
     deny = json.loads((TEMPLATE / ".claude" / "settings.json").read_text())["permissions"]["deny"]
     for rule in ("WebFetch", "WebSearch", "Bash(curl:*)", "Bash(wget:*)", "Read(./private/**)", "Edit(./raw/**)",
-                 "Write(./raw/**)", "Read(./out_real/**)", "Bash(python tools/*)"):
+                 "Edit(./private/**)", "Read(./out_real/**)", "Bash(python tools/*)"):
         assert rule in deny
+    assert not [r for r in deny if r.startswith("Write(")]          # Claude Code ignores these and warns
+    perms = json.loads((TEMPLATE / ".claude" / "settings.json").read_text())["permissions"]
+    assert perms["defaultMode"] == "acceptEdits"                     # never auto or bypass
+    assert perms["allow"] == ["Bash(python work/scripts/*)", "Bash(python3 work/scripts/*)"]
 
 
 def test_setup_script_refuses_synced_folders_and_makes_raw_readonly(tmp_path):
