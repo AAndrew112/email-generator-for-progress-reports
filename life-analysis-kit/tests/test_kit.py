@@ -436,3 +436,26 @@ def test_generated_data_in_work_stays_ignored():
     for path in ("template/work/docs_pseudo.jsonl", "template/work/index.sqlite", "template/raw/archive.json",
                  "template/private/key.json", "template/out/01_manifest.md"):
         assert subprocess.run(["git", "-C", str(KIT), "check-ignore", "-q", path]).returncode == 0, path
+
+
+def test_names_the_recogniser_capitalises_only_part_of_the_time_are_caught(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    for d in ("raw", "private", "work"):
+        (r / d).mkdir(exist_ok=True)
+    sentences = (["We saw Dawn at the store."] * 6 + ["And the dawn was lovely today."] * 4      # name, 60% capitalised
+                 + ["Basically it works."] * 20 + ["It basically works fine."] * 20)             # ordinary sentence-starter
+    rec = {"record_id": "mp-1", "source_type": "marco_polo", "date": "2020-01-02", "time": "10:00:00",
+           "timezone": "-08:00", "timestamp_confidence": "exact", "transcript": " ".join(sentences),
+           "source_filename": "x.mp4", "source_location": "/x", "page_number": None, "duration": 1.0,
+           "speaker_verification": None, "transcription_status": "machine", "review_required": False, "metadata": {}}
+    (r / "raw" / "archive.json").write_text(json.dumps({"records": [rec], "undated_records": []}))
+    run(r, "tools/pseudonymize.py", "--allow-no-names")
+    out = docs(r)[0]["text"]
+    assert "We saw [NAME_" in out and "the dawn was lovely" in out      # capitalised form replaced, common noun kept
+    assert out.count("Basically it works") == 20                          # sentence-starters are not names
+
+
+def test_journal_share_in_eras_never_exceeds_one(root):
+    for e in json.loads((root / "work" / "eras.json").read_text()):
+        assert 0 <= e["journal_share"] <= 1

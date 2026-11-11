@@ -28,7 +28,7 @@ STOP = set("the a an and or but if so to of in on at for with as is are was were
 
 
 def monthly_features(chunks: list[dict]) -> tuple[list[str], np.ndarray, list[str], dict]:
-    per: dict[str, dict] = defaultdict(lambda: {"words": 0, "docs": set(), "journal": 0, "sent": 0,
+    per: dict[str, dict] = defaultdict(lambda: {"words": 0, "docs": set(), "journal": set(), "sent": 0,
                                                  "first": 0, "vocab": Counter()})
     for c in chunks:
         m = month_key(c["date"])
@@ -36,7 +36,7 @@ def monthly_features(chunks: list[dict]) -> tuple[list[str], np.ndarray, list[st
             continue
         w = words(c["text"])
         p = per[m]
-        p["words"] += len(w); p["docs"].add(c["doc_id"]); p["journal"] += c["kind"] == "journal"
+        p["words"] += len(w); p["docs"].add(c["doc_id"]); p["journal"].update([c["doc_id"]] if c["kind"] == "journal" else [])
         p["sent"] += max(1, sum(c["text"].count(x) for x in ".!?"))
         p["first"] += sum(t in PRONOUNS["i_me"] for t in w)
         p["vocab"].update(t for t in w if t not in STOP and len(t) > 2)
@@ -49,7 +49,7 @@ def monthly_features(chunks: list[dict]) -> tuple[list[str], np.ndarray, list[st
     k = min(5, len(months) - 1, V.shape[1])
     comps = (np.linalg.svd(V, full_matrices=False)[0][:, :k] * 1.0) if k > 0 else np.zeros((len(months), 0))
     base_names = ["log_words", "docs", "journal_share", "mean_sentence_words", "first_person_rate"]
-    base = np.array([[np.log1p(per[m]["words"]), len(per[m]["docs"]), per[m]["journal"] / max(1, len(per[m]["docs"])),
+    base = np.array([[np.log1p(per[m]["words"]), len(per[m]["docs"]), len(per[m]["journal"]) / max(1, len(per[m]["docs"])),
                       per[m]["words"] / per[m]["sent"], per[m]["first"] / max(1, per[m]["words"])]
                      for m in months])
     X = np.hstack([base, comps])
@@ -113,7 +113,7 @@ def main() -> None:
         eras.append({"era_id": f"E{i}", "start": ms[0], "end": ms[-1], "months": len(ms),
                      "documents": sum(len(per[m]["docs"]) for m in ms),
                      "words": sum(per[m]["words"] for m in ms),
-                     "journal_share": round(sum(per[m]["journal"] for m in ms) / max(1, sum(len(per[m]["docs"]) for m in ms)), 2),
+                     "journal_share": round(sum(len(per[m]["journal"]) for m in ms) / max(1, sum(len(per[m]["docs"]) for m in ms)), 2),
                      "distinctive_terms": distinctive_terms(chunks, months, lo, hi)})
     (WORK / "eras.json").write_text(json.dumps(eras, indent=1), encoding="utf-8")
     with open(WORK / "monthly_features.csv", "w", newline="") as fh:

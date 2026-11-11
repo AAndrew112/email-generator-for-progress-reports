@@ -64,6 +64,11 @@ Agent prompt with the tier's `model`. Never add corpus text to a prompt; give ID
 Free exploration ("Unprompted findings") is done by one extra `sonnet` agent per era with
 `prompts/free_exploration.md`, then the synthesis agent selects the survivors.
 
+## Long eras
+Era segmentation tends to follow the change from journals to chat, so one era can hold most of the corpus.
+If an era holds more than a quarter of the words, run the lens passes on calendar-year windows inside it and
+synthesize the windows before the cross-era step. Log the windows in the methods log.
+
 ## Cost control
 - Read each chunk in full at most once at Tier 1; later tiers work from extractions and pull full text
   only through `search.py`, in small numbers.

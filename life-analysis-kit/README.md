@@ -94,7 +94,7 @@ python3 tools/check_setup.py
 ```
 Everything should say PASS. Then check your account's retention settings (above).
 
-**5. Start the analysis:**
+**5. Start the analysis** (always from this folder; the header of Claude Code should show `~/life-analysis`):
 ```bash
 cd ~/life-analysis && claude
 ```

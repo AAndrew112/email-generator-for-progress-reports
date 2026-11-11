@@ -24,6 +24,22 @@ STOP_CAPS = {
 
 CAP_WORD = re.compile(r"\b[A-Z][a-z]{2,}(?:[A-Z][a-z]+)*\b")
 LOW_WORD = re.compile(r"\b[a-z]{3,}\b")
+# Capitalisation in the middle of a sentence (after a lower-case word, digit or comma) is the clearest sign
+# of a name: ordinary words only get a capital at the start of a sentence.
+MID_CAP = re.compile(r"(?<=[a-z0-9,;:] )[A-Z][a-z]{2,}(?:[A-Z][a-z]+)*\b")
+MID_LOW = re.compile(r"(?<=[a-z0-9,;:] )[a-z]{3,}\b")
+
+
+def is_name_like(word: str, cap: Counter, low: Counter, mid_cap: Counter, mid_low: Counter) -> bool:
+    """Name if it is (almost) never lower case, or is capitalised mid-sentence at least 30% of the time.
+
+    The second rule catches names the recogniser writes in lower case a third of the time, which the
+    first rule misses. Case-sensitive replacement then only touches the capitalised form.
+    """
+    if low[word.lower()] <= 0.25 * cap[word]:
+        return True
+    m = mid_cap[word]
+    return m >= 3 and m / (m + mid_low[word.lower()]) >= 0.3
 
 # A capitalised word that follows lower-case text, a digit or a comma is probably a name.
 _MID_SENTENCE_CAP = re.compile(r"(?<=[a-z0-9,;] )[A-Z][a-z]{2,}\b")
@@ -71,14 +87,18 @@ def rank_name_like(texts: list[str], context: int = 30) -> list[dict[str, Any]]:
     """
     cap: Counter[str] = Counter()
     low: Counter[str] = Counter()
+    mid_cap: Counter[str] = Counter()
+    mid_low: Counter[str] = Counter()
     docs: defaultdict[str, set[int]] = defaultdict(set)
     sample: dict[str, str] = {}
     for i, text in enumerate(texts):
         low.update(LOW_WORD.findall(text))
+        mid_cap.update(MID_CAP.findall(text))
+        mid_low.update(MID_LOW.findall(text))
         for m in CAP_WORD.finditer(text):
             w = m.group(0)
             cap[w] += 1
             docs[w].add(i)
             sample.setdefault(w, text[max(0, m.start() - context): m.end() + context].replace("\n", " "))
     return [{"word": w, "count": n, "documents": len(docs[w]), "example": sample[w]}
-            for w, n in cap.most_common() if w not in STOP_CAPS and low[w.lower()] <= 0.25 * n]
+            for w, n in cap.most_common() if w not in STOP_CAPS and is_name_like(w, cap, low, mid_cap, mid_low)]

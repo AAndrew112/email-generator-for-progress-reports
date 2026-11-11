@@ -35,7 +35,9 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import CAP_WORD, LOW_WORD, STOP_CAPS, load_records, scan_candidates  # noqa: E402
+from _common import (  # noqa: E402
+    CAP_WORD, LOW_WORD, MID_CAP, MID_LOW, STOP_CAPS, is_name_like, load_records, scan_candidates,
+)
 
 TRUTHY = {"yes", "y", "true", "1"}
 REDACTIONS = [
@@ -169,8 +171,10 @@ class Pseudonymizer:
         return self._ner(self._names(self._redact(text)))
 
     def learn_auto_names(self, texts: list[str], not_names: set[str]) -> int:
-        """Find name-like words in the whole corpus: capitalised words that are (almost) never
-        written in lower case. Ordinary words (So, Like, Maybe) also appear lower-case, names do not.
+        """Find name-like words in the whole corpus: capitalised words that are (almost) never written
+        in lower case, or that are capitalised in the middle of sentences at least 30% of the time
+        (speech recognition capitalises names inconsistently). Ordinary words (So, Like, Maybe) only
+        get a capital at the start of a sentence.
         """
         self.not_names = not_names
         self.recording = False
@@ -178,11 +182,15 @@ class Pseudonymizer:
         self.recording = True
         cap: Counter[str] = Counter()
         low: Counter[str] = Counter()
+        mid_cap: Counter[str] = Counter()
+        mid_low: Counter[str] = Counter()
         for t in base:
             cap.update(CAP_WORD.findall(t))
             low.update(LOW_WORD.findall(t))
-        names = [w for w, n in cap.items()
-                 if w not in STOP_CAPS and w not in not_names and low[w.lower()] <= 0.25 * n]
+            mid_cap.update(MID_CAP.findall(t))
+            mid_low.update(MID_LOW.findall(t))
+        names = [w for w in cap if w not in STOP_CAPS and w not in not_names
+                 and is_name_like(w, cap, low, mid_cap, mid_low)]
         self.auto_groups = self._group(names, cap, base)
         self.auto_ids = {w: tok for tok, members, _ in self.auto_groups for w in members}
         names = list(self.auto_ids)

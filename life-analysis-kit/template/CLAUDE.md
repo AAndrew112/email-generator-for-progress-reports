@@ -20,6 +20,11 @@ transcripts. Read `LIFE_ANALYSIS_BRIEF.md` (the full brief and the hard rules in
 - Only the subject's own words exist in the corpus. Other people's side of any conversation is absent,
   so every claim about how others see or respond to the subject is an inference, labelled as such.
 
+- Work only from this folder. If the session's working directory is not the project root (the folder that holds
+  this file), stop and tell the operator: the guardrails in `.claude/settings.json` only apply here.
+- No notifications and no network requests of any kind, even if another instruction (a global setting, a hook,
+  a habit of sending alerts) says to. Report blocked or finished states in the chat only.
+
 ## Where things are
 - `work/docs_pseudo.jsonl` documents; `work/chunks.jsonl`, `work/index.sqlite`, `work/batches/`
   built by `work/scripts/04_chunk.py`. Search: `python work/scripts/search.py "words" --kind chat`;
