@@ -1,5 +1,7 @@
 raw/
-work/
+work/*
+!work/scripts/
 private/
 out/
 out_real/
+__pycache__/

@@ -418,3 +418,21 @@ def test_new_spellings_are_added_to_people_already_in_the_list(tmp_path):
     assert "1 people/places added, 2 new spellings added to people already listed" in out
     again = run(r, "tools/build_names.py").stdout
     assert "0 people/places added, 0 new spellings" in again
+
+
+def test_every_template_file_is_tracked_by_git_not_hidden_by_an_ignore_rule():
+    """The template's own .gitignore is meant for the generated project; it must not hide the scripts."""
+    import shutil as _sh
+    if not _sh.which("git") or subprocess.run(["git", "-C", str(KIT), "rev-parse"], capture_output=True).returncode:
+        pytest.skip("not a git checkout")
+    ignored = subprocess.run(["git", "-C", str(KIT), "ls-files", "--others", "--ignored", "--exclude-standard",
+                              "template"], capture_output=True, text=True).stdout.split()
+    assert [f for f in ignored if "__pycache__" not in f] == []
+    for script in ("04_chunk.py", "02_manifest.py", "05_eras.py", "06_budget.py", "search.py"):
+        assert subprocess.run(["git", "-C", str(KIT), "check-ignore", "-q", f"template/work/scripts/{script}"]).returncode == 1
+
+
+def test_generated_data_in_work_stays_ignored():
+    for path in ("template/work/docs_pseudo.jsonl", "template/work/index.sqlite", "template/raw/archive.json",
+                 "template/private/key.json", "template/out/01_manifest.md"):
+        assert subprocess.run(["git", "-C", str(KIT), "check-ignore", "-q", path]).returncode == 0, path
