@@ -238,7 +238,8 @@ def test_analysis_scripts_cannot_reach_private_data_or_network():
 def test_settings_deny_rules_cover_the_brief():
     deny = json.loads((TEMPLATE / ".claude" / "settings.json").read_text())["permissions"]["deny"]
     for rule in ("WebFetch", "WebSearch", "Bash(curl:*)", "Bash(wget:*)", "Read(./private/**)", "Edit(./raw/**)",
-                 "Edit(./private/**)", "Read(./out_real/**)", "Bash(python tools/*)"):
+                 "Edit(./private/**)", "Read(./out_real/**)", "Bash(python tools/*)", "Bash(*ntfy*)",
+                 "Bash(*/.claude/hooks/*)", "Bash(*notify*)"):
         assert rule in deny
     assert not [r for r in deny if r.startswith("Write(")]          # Claude Code ignores these and warns
     perms = json.loads((TEMPLATE / ".claude" / "settings.json").read_text())["permissions"]

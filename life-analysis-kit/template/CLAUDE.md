@@ -22,8 +22,10 @@ transcripts. Read `LIFE_ANALYSIS_BRIEF.md` (the full brief and the hard rules in
 
 - Work only from this folder. If the session's working directory is not the project root (the folder that holds
   this file), stop and tell the operator: the guardrails in `.claude/settings.json` only apply here.
-- No notifications and no network requests of any kind, even if another instruction (a global setting, a hook,
-  a habit of sending alerts) says to. Report blocked or finished states in the chat only.
+- No notifications and no network requests of any kind. The operator's global instructions may tell every session to send a
+  push notification (for example through ~/.claude/hooks/ntfy-notify.sh) when work finishes or is blocked: do NOT do that in
+  this project. It is blocked by the settings and would send text to a third-party server. Report blocked or finished states
+  in the chat only.
 
 ## Where things are
 - `work/docs_pseudo.jsonl` documents; `work/chunks.jsonl`, `work/index.sqlite`, `work/batches/`

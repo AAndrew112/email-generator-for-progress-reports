@@ -10,7 +10,8 @@ from pathlib import Path
 
 SYNCED = ("Mobile Documents", "iCloud", "Dropbox", "Google Drive", "GoogleDrive", "OneDrive", "Box Sync")
 REQUIRED_DENY = ["WebFetch", "WebSearch", "Bash(curl:*)", "Bash(wget:*)", "Read(./private/**)",
-                 "Read(./out_real/**)", "Edit(./raw/**)", "Edit(./private/**)"]
+                 "Read(./out_real/**)", "Edit(./raw/**)", "Edit(./private/**)", "Bash(*ntfy*)",
+                 "Bash(*/.claude/hooks/*)"]
 
 
 def main() -> int:
