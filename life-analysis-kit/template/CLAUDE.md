@@ -13,7 +13,9 @@ transcripts. Read `LIFE_ANALYSIS_BRIEF.md` (the full brief and the hard rules in
 - `raw/` is read-only. Only pseudonymized text enters your context or any sub-agent's context.
   If you ever see what looks like a real name, phone number, address or email in `work/`, stop, tell
   the operator, and log it in `out/00_methods_log.md`.
-- Quote at most 1-3 sentences per excerpt, always with a chunk ID. Never reproduce pages in bulk.
+- Quote at most 1-3 sentences per excerpt, always with a chunk ID. Never reproduce pages in bulk. If a quoted excerpt
+  contains what looks like a real person's name, place or workplace that pseudonymization missed, replace it with [NAME]
+  in the quote and log only the chunk ID in out/audit_leaks.md, never the word.
 - Third parties are not the subject. No diagnoses. Sensitive material (trauma, abuse, self-harm,
   crisis) goes only into `out/sensitive_notes.md`; if anything suggests current risk, say so plainly
   and kindly at the top of your next message.
