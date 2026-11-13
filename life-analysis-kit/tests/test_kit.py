@@ -529,3 +529,11 @@ def test_build_names_passes_pattern_aliases_through(tmp_path):
     run(r, "tools/build_names.py")
     rows = {x["name"]: x for x in csv.DictReader(open(r / "private" / "names_input.csv"))}
     assert rows["Priya"]["aliases"] == "re:(schm|shm)[a-z]*"
+
+
+def test_sandbox_blocks_network_and_escape_and_hides_private_folders():
+    sb = json.loads((TEMPLATE / ".claude" / "settings.json").read_text())["sandbox"]
+    assert sb["enabled"] and sb["failIfUnavailable"] and sb["autoAllowBashIfSandboxed"]
+    assert sb["allowUnsandboxedCommands"] is False
+    assert sb["network"]["allowedDomains"] == []
+    assert "./private" in sb["filesystem"]["denyRead"] and "./out_real" in sb["filesystem"]["denyRead"]

@@ -37,5 +37,20 @@
       "Bash(*/.claude/hooks/*)",
       "Bash(*notify*)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "denyRead": [
+        "./private",
+        "./out_real"
+      ]
+    },
+    "network": {
+      "allowedDomains": []
+    }
   }
 }

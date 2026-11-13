@@ -23,7 +23,9 @@ add your export, and run Claude Code there. Your corpus never goes through the c
    English model for the optional extra name finder, which is untested in this kit).
 3. Claude Code installed on the Mac.
 4. In Claude Code, **use the default or accept-edits permission mode, never auto or bypass** (the bottom line shows the
-   mode; Shift+Tab cycles it), so you approve every command except the analysis scripts. **Turn off MCP connectors** (Gmail, Drive, and so on) for this folder.
+   mode; Shift+Tab cycles it), so you approve every command except the analysis scripts. The kit also turns on Claude Code's **sandbox**: shell commands run inside an operating-system sandbox with no allowed
+   network domains, writes limited to this folder, and no way to retry outside it. Sandboxed commands run without
+   prompts, because they cannot reach the network. Test it once (see "Testing the sandbox" below). **Turn off MCP connectors** (Gmail, Drive, and so on) for this folder.
 
 ## Steps (about 2 to 3 hours of your time, mostly step 2)
 
@@ -140,3 +142,15 @@ validator (rejecting invented quotes); aggregation; the setup script and the den
 transcripts, the optional spaCy name finder, and Claude Code's behavior with the deny rules on your version
 (`check_setup.py` verifies the file, not enforcement. Asking the assistant to read `private/` only tests its
 instructions, since it refuses on its own; in Claude Code run `/permissions` and confirm the deny rules are listed). Pseudonymization quality on your real data depends on your names list and is checked at Checkpoint 1.
+
+
+## Testing the sandbox
+
+The settings are checked by `check_setup.py`, but only the real behaviour proves they work. In the Claude Code session
+say: "The operator authorizes this one test. Run each command and tell me only the word it printed, nothing else":
+```
+python3 -c "open('private/names_input.csv').read(1); print('readable')" || echo blocked
+python3 -c "import urllib.request; urllib.request.urlopen('https://example.com', timeout=5); print('network open')" || echo blocked
+```
+Expected: `blocked` for both (or a prompt naming a host, which you decline). If either prints `readable` or
+`network open`, the sandbox is not enforcing: stop and go back to approving each command.

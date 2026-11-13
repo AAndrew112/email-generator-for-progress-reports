@@ -32,6 +32,11 @@ def main() -> int:
     check(perms.get("defaultMode") in ("acceptEdits", "default"),
           "permission mode is not auto or bypass (you approve commands)")
     check(not any(r.startswith("Write(") for r in deny), "no Write(...) deny rules (Claude Code ignores them; Edit(...) covers writes)")
+    sb = json.loads(settings.read_text()).get("sandbox", {}) if settings.exists() else {}
+    check(sb.get("enabled") is True and sb.get("failIfUnavailable") is True,
+          "sandbox is enabled and required (commands cannot silently run outside it)")
+    check(sb.get("allowUnsandboxedCommands") is False, "commands cannot retry outside the sandbox")
+    check(not sb.get("network", {}).get("allowedDomains"), "sandbox allows no network domains")
     archive = root / "raw" / "archive.json"
     check(archive.exists(), "raw/archive.json is present")
     check(archive.exists() and not (archive.stat().st_mode & 0o222), "raw/archive.json is read-only")
