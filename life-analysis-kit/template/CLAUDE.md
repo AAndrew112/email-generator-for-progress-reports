@@ -27,6 +27,11 @@ transcripts. Read `LIFE_ANALYSIS_BRIEF.md` (the full brief and the hard rules in
   this project. It is blocked by the settings and would send text to a third-party server. Report blocked or finished states
   in the chat only.
 
+- Pseudonymization audit: `work/keep_visible.txt` lists words the operator deliberately left readable (brands, apps,
+  media, topics). They are not leaks: do not count them. Judge only whether real people's names, places,
+  workplaces, schools or contact details remain. In the chat, report counts and chunk IDs only, never the words
+  themselves; write the words to a file under `work/audit/` for the operator to read.
+
 ## Where things are
 - `work/docs_pseudo.jsonl` documents; `work/chunks.jsonl`, `work/index.sqlite`, `work/batches/`
   built by `work/scripts/04_chunk.py`. Search: `python work/scripts/search.py "words" --kind chat`;

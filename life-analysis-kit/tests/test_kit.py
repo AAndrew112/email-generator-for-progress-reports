@@ -460,3 +460,18 @@ def test_names_the_recogniser_capitalises_only_part_of_the_time_are_caught(tmp_p
 def test_journal_share_in_eras_never_exceeds_one(root):
     for e in json.loads((root / "work" / "eras.json").read_text()):
         assert 0 <= e["journal_share"] <= 1
+
+
+def test_keep_visible_words_are_handed_to_the_assistant_and_names_are_not(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    for d in ("raw", "private", "work"):
+        (r / d).mkdir(exist_ok=True)
+    synth.write_archive(r / "raw" / "archive.json")
+    (r / "private" / "names_input.csv").write_text(synth.NAMES_CSV, encoding="utf-8")
+    (r / "private" / "not_names.txt").write_text("Polly\nXanax\n")
+    run(r, "tools/pseudonymize.py")
+    assert (r / "work" / "keep_visible.txt").read_text().split() == ["Polly", "Xanax"]
+    assert json.loads((r / "work" / "pseudonymization_report.json").read_text())["keep_visible_words"] == 2
+    run(r, "tools/pseudonymize.py", "--no-auto")
+    assert (r / "work" / "keep_visible.txt").exists()

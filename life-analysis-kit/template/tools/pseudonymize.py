@@ -322,9 +322,9 @@ def main() -> None:
     pz = Pseudonymizer(names_csv, ner=args.ner)
     records = load_records(args.input or root / "raw" / "archive.json")
     auto_words = 0
+    protect = root / "private" / "not_names.txt"
+    keep = {w.strip() for w in protect.read_text(encoding="utf-8").splitlines() if w.strip()} if protect.exists() else set()
     if not args.no_auto:
-        protect = root / "private" / "not_names.txt"
-        keep = {w.strip() for w in protect.read_text(encoding="utf-8").splitlines() if w.strip()} if protect.exists() else set()
         texts = [(r.get("transcript") or "") for r in records]
         texts += [Path(r.get("source_filename") or "").stem for r in records if r.get("source_type") == "journal"]
         auto_words = pz.learn_auto_names(texts, keep)
@@ -337,6 +337,9 @@ def main() -> None:
         for d in docs:
             fh.write(json.dumps(d, ensure_ascii=False) + "\n")
 
+    # Words the operator chose to leave readable (topics, brands, apps, media). They are not people or places and are
+    # already visible in the text, so the assistant gets the list to avoid counting them as pseudonymization misses.
+    (work / "keep_visible.txt").write_text("".join(w + "\n" for w in sorted(keep)), encoding="utf-8")
     residual = scan_candidates([d["text"] for d in docs], ratio=0.3)
     with open(private / "residual_candidates.csv", "w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=["word", "count", "documents", "example"], lineterminator="\n")
@@ -368,6 +371,7 @@ def main() -> None:
         "ner_used": pz.nlp is not None,
         "automatic_catch_all": not args.no_auto,
         "auto_name_groups": auto_words,
+        "keep_visible_words": len(keep),
     }
     (work / "pseudonymization_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
