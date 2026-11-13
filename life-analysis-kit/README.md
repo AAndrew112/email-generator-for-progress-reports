@@ -76,6 +76,17 @@ first-plus-last names are grouped under one token (Priya / Pria, "Jane Smith" / 
 (Sara, Sarah) stay separate. This is deliberately aggressive: it may also redact an unusual capitalized word that
 is not a name, which costs a little detail but not safety.
 
+Two extra tools for the hard cases:
+- **Lower-case spellings.** Speech recognition often writes names in lower case, which capital letters alone cannot
+  reveal. If your Mac has a word list (`/usr/share/dict/words`, present by default) the tool also treats any
+  word that is not an ordinary English word and appears capitalised mid-sentence at least once as a name, and
+  replaces it in every case. The report shows `dictionary_used` and `auto_lowercase_name_words`. Set
+  `PHA_DICT=/path/to/list` to use another list, or `PHA_DICT=none` to turn it off.
+- **Pattern aliases.** A nickname that appears in many spellings can be covered by one row in the sheet whose
+  `word` is `re:` plus a regular expression (matched case-insensitively on whole words), with `same_as` set to the
+  person, for example `re:(schm|shm|shem)[a-z]*`. Preview what a pattern would hit before adding it, so it does
+  not swallow ordinary words.
+
 Then check three files in `private/` (they hold real names, so never share them):
 - `auto_groups.csv`: the groups it made, biggest first. Skim the top 40. If two different people were merged,
   or someone important got a plain `NAME_` label, add them to `names_input.csv` (explicit rows win), then re-run.
@@ -122,7 +133,7 @@ Never paste real-name outputs into any assistant.
 
 ## What has and has not been tested
 
-Tested on **synthetic data only** (`tests/`, 21 tests): pseudonymization of planted names, aliases, misspellings, automatic catching and grouping of unlisted names,
+Tested on **synthetic data only** (`tests/`, 36 tests): pseudonymization of planted names, aliases, misspellings, automatic catching and grouping of unlisted names,
 emails, phones, URLs, handles and addresses; case-sensitive names; no file names or paths in the output;
 re-identification; chunk IDs and partial dates; search; era detection near a planted shift; the extraction
 validator (rejecting invented quotes); aggregation; the setup script and the deny rules. Not tested: real

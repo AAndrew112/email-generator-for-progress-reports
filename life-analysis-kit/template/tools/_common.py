@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -17,6 +18,8 @@ STOP_CAPS = {
     "Mom", "Dad", "Mommy", "Daddy", "Grandma", "Grandpa", "Hey", "Hello", "Thanks", "Thank",
     "Jan", "Feb", "Mar", "Apr", "Aug", "Sept", "Oct", "Nov", "Dec", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat",
     "Sun", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays",
+    "Gonna", "Wanna", "Gotta", "Kinda", "Sorta", "Lemme", "Gimme", "Cuz", "Tho", "Yall", "Lol", "Omg", "Umm", "Uhh",
+    "Ahh", "Ohh", "Dunno", "Tryna", "Imma", "Coulda", "Shoulda", "Woulda", "Hafta", "Mmhmm",
     "Hmm", "Mmm", "Ugh", "Wow", "Whoa", "Mhm", "Huh", "Ooh", "Aww", "Yay", "Yep", "Nope", "Alright",
     "Oops", "Gosh", "Geez", "Dude", "Girl", "Guys", "Please", "Sorry", "Anyways", "Honestly",
     "American", "English", "Spanish", "Mexican", "Italian", "French", "Chinese", "Covid",
@@ -102,3 +105,19 @@ def rank_name_like(texts: list[str], context: int = 30) -> list[dict[str, Any]]:
             sample.setdefault(w, text[max(0, m.start() - context): m.end() + context].replace("\n", " "))
     return [{"word": w, "count": n, "documents": len(docs[w]), "example": sample[w]}
             for w, n in cap.most_common() if w not in STOP_CAPS and is_name_like(w, cap, low, mid_cap, mid_low)]
+
+
+def load_dictionary() -> set[str]:
+    """Lower-case English words, from PHA_DICT or the system word list (macOS has /usr/share/dict/words).
+
+    Only entries written in lower case are kept, so proper names in the list do not count as ordinary words.
+    PHA_DICT=none turns the feature off. Returns an empty set when no list is found.
+    """
+    choice = os.environ.get("PHA_DICT")
+    if choice == "none":
+        return set()
+    for cand in (choice, "/usr/share/dict/words", "/usr/share/dict/web2"):
+        if cand and Path(cand).is_file():
+            with open(cand, encoding="utf-8", errors="ignore") as fh:
+                return {w.strip() for w in fh if w.strip() and w.strip()[0].islower()}
+    return set()

@@ -18,7 +18,7 @@ PY = sys.executable
 
 
 def run(root: Path, *cmd: str, check: bool = True) -> subprocess.CompletedProcess:
-    env = {**os.environ, "LIFE_ANALYSIS_ROOT": str(root)}
+    env = {"PHA_DICT": "none", **os.environ, "LIFE_ANALYSIS_ROOT": str(root)}
     return subprocess.run([PY, *cmd], cwd=root, env=env, capture_output=True, text=True, check=check)
 
 
@@ -475,3 +475,57 @@ def test_keep_visible_words_are_handed_to_the_assistant_and_names_are_not(tmp_pa
     assert json.loads((r / "work" / "pseudonymization_report.json").read_text())["keep_visible_words"] == 2
     run(r, "tools/pseudonymize.py", "--no-auto")
     assert (r / "work" / "keep_visible.txt").exists()
+
+
+def _tiny_archive(r, text):
+    for d in ("raw", "private", "work"):
+        (r / d).mkdir(exist_ok=True)
+    rec = {"record_id": "mp-1", "source_type": "marco_polo", "date": "2020-01-02", "time": "10:00:00",
+           "timezone": "-08:00", "timestamp_confidence": "exact", "transcript": text, "source_filename": "x.mp4",
+           "source_location": "/x", "page_number": None, "duration": 1.0, "speaker_verification": None,
+           "transcription_status": "machine", "review_required": False, "metadata": {}}
+    (r / "raw" / "archive.json").write_text(json.dumps({"records": [rec], "undated_records": []}))
+
+
+def test_lowercase_spellings_of_non_dictionary_words_are_caught_with_a_word_list(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    words = "we went to dinner with then called saw again are go be fun said and the it was so".split()
+    (tmp_path / "words.txt").write_text("\n".join(words) + "\nGeorge\n")
+    text = ("We went to dinner with Kaylah. Then kaylah called. We saw kaylah again. "
+            "We are gonna go. Gonna be fun, I said. " + "it was so gonna be fun and " * 40)
+    _tiny_archive(r, text)
+    (r / "private" / "names_input.csv").write_text("name,category,token,aliases,case_sensitive\n")
+    env = {**os.environ, "LIFE_ANALYSIS_ROOT": str(r), "PHA_DICT": str(tmp_path / "words.txt")}
+    subprocess.run([PY, "tools/pseudonymize.py"], cwd=r, env=env, check=True, capture_output=True)
+    out = docs(r)[0]["text"]
+    assert "kaylah" not in out.lower() and out.count("[NAME_") == 3          # every case of the name replaced
+    assert "gonna" in out.lower() and "dinner" in out                        # slang and ordinary words untouched
+    rep = json.loads((r / "work" / "pseudonymization_report.json").read_text())
+    assert rep["dictionary_used"] and rep["auto_lowercase_name_words"] == 1
+    run(r, "tools/pseudonymize.py")                                           # PHA_DICT=none: feature off
+    assert "kaylah" in docs(r)[0]["text"]
+
+
+def test_pattern_aliases_cover_a_family_of_spellings_without_touching_other_words(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    _tiny_archive(r, "Shmaltz came by. Then schmoll left and Shemals called. The school started at the schmoz hour. "
+                     "Priya waved.")
+    (r / "private" / "names_input.csv").write_text(
+        'name,category,token,aliases,case_sensitive\nPriya,FRIEND,,"re:(schm|shm|shem)[a-z]*",\n')
+    run(r, "tools/pseudonymize.py", "--no-auto")
+    out = docs(r)[0]["text"]
+    assert out == "[FRIEND_01] came by. Then [FRIEND_01] left and [FRIEND_01] called. The school started at the [FRIEND_01] hour. [FRIEND_01] waved."
+    assert json.loads((r / "work" / "pseudonymization_report.json").read_text())["pattern_aliases"] == 1
+
+
+def test_build_names_passes_pattern_aliases_through(tmp_path):
+    r = tmp_path / "x"
+    shutil.copytree(TEMPLATE, r)
+    (r / "private").mkdir(exist_ok=True)
+    (r / "private" / "name_candidates.csv").write_text(
+        "word,category,same_as,case_sensitive\nPriya,FRIEND,,\n\"re:(schm|shm)[a-z]*\",,Priya,\n")
+    run(r, "tools/build_names.py")
+    rows = {x["name"]: x for x in csv.DictReader(open(r / "private" / "names_input.csv"))}
+    assert rows["Priya"]["aliases"] == "re:(schm|shm)[a-z]*"

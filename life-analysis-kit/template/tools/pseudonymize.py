@@ -36,7 +36,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import (  # noqa: E402
-    CAP_WORD, LOW_WORD, MID_CAP, MID_LOW, STOP_CAPS, is_name_like, load_records, scan_candidates,
+    CAP_WORD, LOW_WORD, MID_CAP, MID_LOW, STOP_CAPS, is_name_like, load_dictionary, load_records,
+    scan_candidates,
 )
 
 TRUTHY = {"yes", "y", "true", "1"}
@@ -62,6 +63,7 @@ class Pseudonymizer:
         self.ner_ids: dict[str, str] = {}
         self.entries: list[tuple[str, str, bool]] = []
         self.tokens_declared: list[str] = []
+        self.regex_aliases: list[tuple[re.Pattern[str], str]] = []
         if names_csv is not None:
             self._load_names(names_csv)
         norm = lambda x: re.sub(r"\s+", " ", x)  # noqa: E731
@@ -75,6 +77,10 @@ class Pseudonymizer:
         self.auto_re: re.Pattern[str] | None = None
         self.auto_ids: dict[str, str] = {}
         self.auto_groups: list[tuple[str, list[str], int]] = []
+        self.auto_ci_ids: dict[str, str] = {}
+        self.auto_ci_re: re.Pattern[str] | None = None
+        self.lowercase_words = 0
+        self.dictionary_used = False
         self.not_names: set[str] = set()
         if ner:
             try:
@@ -112,6 +118,13 @@ class Pseudonymizer:
                 cs = (row.get("case_sensitive") or "").strip().lower() in TRUTHY
                 surfaces = [name] + [a.strip() for a in (row.get("aliases") or "").split(";") if a.strip()]
                 for s in surfaces:
+                    if s.lower().startswith("re:"):  # a pattern covering a family of spellings
+                        try:
+                            rx = re.compile(rf"(?<![A-Za-z0-9_\[])(?:{s[3:].strip()})(?![A-Za-z0-9_\]])", re.I)
+                        except re.error as exc:
+                            raise SystemExit(f"Bad pattern '{s}' for {name}: {exc}") from exc
+                        self.regex_aliases.append((rx, token))
+                        continue
                     k = s if cs else s.lower()
                     if claimed.get(k, token) != token:
                         raise SystemExit(f"'{s}' is listed for two different tokens; fix names_input.csv")
@@ -151,6 +164,8 @@ class Pseudonymizer:
             text = self._cs_re.sub(replacer(self._cs_map, False), text)
         if self._ci_re:
             text = self._ci_re.sub(replacer(self._ci_map, True), text)
+        for rx, tok in self.regex_aliases:
+            text = rx.sub(lambda m, tok=tok: (self._hit(tok, m.group(0)), f"[{tok}]")[1], text)
         return text
 
     def _ner(self, text: str) -> str:
@@ -191,8 +206,23 @@ class Pseudonymizer:
             mid_low.update(MID_LOW.findall(t))
         names = [w for w in cap if w not in STOP_CAPS and w not in not_names
                  and is_name_like(w, cap, low, mid_cap, mid_low)]
+        dictionary = load_dictionary()
+        self.dictionary_used = bool(dictionary)
+        lower_forms: list[str] = []
+        if dictionary:
+            # Words that are not ordinary English words and are capitalised mid-sentence at least once are names
+            # (or brands, or slang). The recogniser also writes them in lower case, so replace every case.
+            have = set(names)
+            lower_forms = [w for w in cap if w not in have and w not in STOP_CAPS and w not in not_names
+                           and w.lower() not in dictionary and mid_cap[w] >= 1 and low[w.lower()] <= 50 * mid_cap[w]]
+            names += lower_forms
+        self.lowercase_words = len(lower_forms)
         self.auto_groups = self._group(names, cap, base)
         self.auto_ids = {w: tok for tok, members, _ in self.auto_groups for w in members}
+        self.auto_ci_ids = {w.lower(): self.auto_ids[w] for w in lower_forms}
+        if lower_forms:
+            alt_ci = "|".join(re.escape(w.lower()) for w in sorted(lower_forms, key=len, reverse=True))
+            self.auto_ci_re = re.compile(rf"(?<![A-Za-z0-9_\[])(?:{alt_ci})(?![A-Za-z0-9_\]])", re.I)
         names = list(self.auto_ids)
         if names:
             alt = "|".join(re.escape(w) for w in sorted(names, key=len, reverse=True))
@@ -248,15 +278,21 @@ class Pseudonymizer:
                 for i, g in enumerate(ordered, 1)]
 
     def _auto(self, text: str) -> str:
-        if self.auto_re is None:
-            return text
-
         def sub(m: re.Match[str]) -> str:
             tok = self.auto_ids[m.group(0)]
             self._hit(tok, m.group(0))
             return f"[{tok}]"
 
-        return self.auto_re.sub(sub, text)
+        def sub_ci(m: re.Match[str]) -> str:
+            tok = self.auto_ci_ids[m.group(0).lower()]
+            self._hit(tok, m.group(0))
+            return f"[{tok}]"
+
+        if self.auto_re is not None:
+            text = self.auto_re.sub(sub, text)
+        if self.auto_ci_re is not None:
+            text = self.auto_ci_re.sub(sub_ci, text)
+        return text
 
     def __call__(self, text: str) -> str:
         return self._auto(self.base(text))
@@ -372,6 +408,9 @@ def main() -> None:
         "automatic_catch_all": not args.no_auto,
         "auto_name_groups": auto_words,
         "keep_visible_words": len(keep),
+        "dictionary_used": pz.dictionary_used,
+        "auto_lowercase_name_words": pz.lowercase_words,
+        "pattern_aliases": len(pz.regex_aliases),
     }
     (work / "pseudonymization_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
